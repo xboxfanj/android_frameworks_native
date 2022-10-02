@@ -50,8 +50,6 @@ struct DisplayCreationArgs {
     // Debugging. Human readable name for the display.
     std::string name;
 
-    // Helper library to get next FBT slot.
-    composer::DisplayExtnIntf *displayExtnIntf = nullptr;
 };
 
 /**
@@ -87,10 +85,6 @@ public:
         return *this;
     }
 
-    DisplayCreationArgsBuilder& setDisplayExtnIntf(composer::DisplayExtnIntf *displayExtnIntf) {
-        mArgs.displayExtnIntf = std::move(displayExtnIntf);
-        return *this;
-    }
 private:
     DisplayCreationArgs mArgs;
 };

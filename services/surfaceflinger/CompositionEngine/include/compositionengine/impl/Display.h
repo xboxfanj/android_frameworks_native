@@ -95,7 +95,6 @@ private:
     Hwc2::PowerAdvisor* mPowerAdvisor = nullptr;
     bool mHasScreenshot = false;
     ui::DisplayConnectionType mConnectionType = ui::DisplayConnectionType::Internal;
-    composer::DisplayExtnIntf *mDisplayExtnIntf = nullptr;
     void beginDraw();
     void endDraw();
     ColorProfile mColorProfile = {ui::ColorMode::NATIVE, ui::Dataspace::UNKNOWN,

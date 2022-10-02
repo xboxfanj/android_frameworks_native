@@ -59,8 +59,6 @@ void Display::setConfiguration(const compositionengine::DisplayCreationArgs& arg
     editState().isSecure = args.isSecure;
     editState().displaySpace.setBounds(args.pixels);
     setName(args.name);
-    mDisplayExtnIntf = args.displayExtnIntf;
-    ALOGI("Display::setConfiguration: mDisplayExtnIntf: %p", mDisplayExtnIntf);
 }
 
 bool Display::isValid() const {
@@ -293,9 +291,6 @@ void Display::applyCompositionStrategy(const std::optional<DeviceRequestedChange
 
 void Display::beginDraw() {
     ATRACE_CALL();
-    if (mDisplayExtnIntf == nullptr) {
-        return;
-    }
     const auto physicalDisplayId = PhysicalDisplayId::tryCast(mId);
     if (!physicalDisplayId.has_value() || isVirtual()) {
         return;

@@ -773,8 +773,6 @@ void SurfaceFlinger::bootFinished() {
         }
 
     }));
-
-    setupDisplayExtnFeatures();
 }
 
 uint32_t SurfaceFlinger::getNewTexture() {
@@ -931,13 +929,6 @@ void SurfaceFlinger::init() {
             fps_list.push_back(int32_t(mode->getFps().getValue()));
         }
     }
-
-    if (mDisplayExtnIntf) {
-        mDisplayExtnIntf->SetFpsMitigationCallback(
-                          [this](float newLevelFps){
-                              setDesiredModeByThermalLevel(newLevelFps);
-                          }, fps_list);
-    }
 #endif
 
     startUnifiedDraw();
@@ -958,12 +949,6 @@ void SurfaceFlinger::InitComposerExtn() {
     if (ret) {
         ALOGI("Unable to create frame scheduler extension");
     }
-
-    ret = mComposerExtnIntf->CreateDisplayExtn(&mDisplayExtnIntf);
-    if (ret) {
-       ALOGI("Unable to create display extension");
-    }
-    ALOGI("Init: mDisplayExtnIntf: %p", mDisplayExtnIntf);
 }
 
 void SurfaceFlinger::startUnifiedDraw() {
@@ -2496,19 +2481,6 @@ bool SurfaceFlinger::commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expected
         mLayerTracing.notify(mVisibleRegionsDirty, frameTime);
     }
 
-#ifdef PASS_COMPOSITOR_TID
-    if (!mTidSentSuccessfully && mBootFinished && mDisplayExtnIntf) {
-        bool sfTid = mDisplayExtnIntf->SendCompositorTid(composer::PerfHintType::kSurfaceFlinger,
-                                                         mSFTid) == 0;
-        bool reTid = mDisplayExtnIntf->SendCompositorTid(composer::PerfHintType::kRenderEngine,
-                                                         mRETid) == 0;
-
-        if (sfTid && reTid) {
-            mTidSentSuccessfully = true;
-        }
-    }
-#endif
-
     persistDisplayBrightness(mustComposite);
 
     return mustComposite && CC_LIKELY(mBootStage != BootStage::BOOTLOADER);
@@ -2524,7 +2496,6 @@ void SurfaceFlinger::composite(nsecs_t frameTime, int64_t vsyncId)
 
     {
         std::lock_guard lock(mEarlyWakeUpMutex);
-        mSendEarlyWakeUp = false;
     }
 
     compositionengine::CompositionRefreshArgs refreshArgs;
@@ -3308,11 +3279,6 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
         }
         uint32_t hwcDisplayId = static_cast<uint32_t>(event.hwcDisplayId);
         bool isConnected = (event.connection == hal::Connection::CONNECTED);
-        if (isDisplayExtnEnabled() && isInternalDisplay) {
-            auto activeConfigId = getHwComposer().getActiveMode(displayId);
-            LOG_ALWAYS_FATAL_IF(!activeConfigId, "HWC returned no active config");
-            updateDisplayExtension(hwcDisplayId, *activeConfigId, isConnected);
-        }
         processDisplayChangesLocked();
     }
 
@@ -3474,7 +3440,6 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     builder.setIsSecure(state.isSecure);
     builder.setPowerAdvisor(mPowerAdvisor.get());
     builder.setName(state.displayName);
-    builder.setDisplayExtnIntf(mDisplayExtnIntf);
     auto compositionDisplay = getCompositionEngine().createDisplay(builder.build());
     compositionDisplay->setLayerCachingEnabled(mLayerCachingEnabled);
 
@@ -4018,9 +3983,6 @@ void SurfaceFlinger::requestDisplayMode(DisplayModePtr mode, DisplayModeEvent ev
     setDesiredActiveMode({mode, event});
 
     uint32_t hwcDisplayId;
-    if (isDisplayExtnEnabled() && getHwcDisplayId(display, &hwcDisplayId)) {
-        setDisplayExtnActiveConfig(hwcDisplayId, mode->getId().value());
-    }
 }
 
 void SurfaceFlinger::triggerOnFrameRateOverridesChanged() {
@@ -8078,12 +8040,6 @@ status_t SurfaceFlinger::setDesiredDisplayModeSpecsInternal(
               preferredDisplayMode->getId().value());
         setDesiredActiveMode({preferredDisplayMode, DisplayModeEvent::Changed});
         uint32_t hwcDisplayId;
-        if (isDisplayExtnEnabled() && getHwcDisplayId(display, &hwcDisplayId)) {
-            setDisplayExtnActiveConfig(hwcDisplayId, preferredDisplayMode->getId().value());
-            if (mDynamicSfIdleEnabled) {
-                setupIdleTimeoutHandling(hwcDisplayId);
-            }
-        }
     } else {
         LOG_ALWAYS_FATAL("Desired display mode not allowed: %d",
                          preferredDisplayMode->getId().value());
@@ -8436,9 +8392,6 @@ void SurfaceFlinger::sample() {
 
 void SurfaceFlinger::setContentFps(uint32_t contentFps) {
     if (mBootFinished && !mSetActiveModePending) {
-        if (mDisplayExtnIntf) {
-            mSentInitialFps = mDisplayExtnIntf->SetContentFps(contentFps) == 0;
-        }
     }
 }
 
@@ -8482,54 +8435,11 @@ bool SurfaceFlinger::getHwcDisplayId(const sp<DisplayDevice>& display, uint32_t 
     return true;
 }
 
-void SurfaceFlinger::updateDisplayExtension(uint32_t displayId, uint32_t configId, bool connected) {
-    ALOGV("updateDisplayExtn: Display:%d, Config:%d, Connected:%d", displayId, configId, connected);
-
-#ifdef EARLY_WAKEUP_FEATURE
-    if (mDisplayExtnIntf) {
-        if (connected) {
-            mDisplayExtnIntf->RegisterDisplay(displayId);
-            mDisplayExtnIntf->SetActiveConfig(displayId, configId);
-        } else {
-            mDisplayExtnIntf->UnregisterDisplay(displayId);
-        }
-    }
-#endif
-}
-
-void SurfaceFlinger::setDisplayExtnActiveConfig(uint32_t displayId, uint32_t activeConfigId) {
-    ALOGV("setDisplayExtnActiveConfig: Display:%d, ActiveConfig:%d", displayId, activeConfigId);
-
-#ifdef EARLY_WAKEUP_FEATURE
-    if (mDisplayExtnIntf) {
-        mDisplayExtnIntf->SetActiveConfig(displayId, activeConfigId);
-    }
-#endif
-}
-
 void SurfaceFlinger::notifyAllDisplaysUpdateImminent() {
     if (!mEarlyWakeUpEnabled) {
         mPowerAdvisor->notifyDisplayUpdateImminent();
         return;
     }
-
-#ifdef EARLY_WAKEUP_FEATURE
-    bool doEarlyWakeUp = false;
-    {
-        // Synchronize the critical section.
-        std::lock_guard lock(mEarlyWakeUpMutex);
-        if (!mSendEarlyWakeUp) {
-            mSendEarlyWakeUp = mPowerAdvisor->canNotifyDisplayUpdateImminent();
-            doEarlyWakeUp = mSendEarlyWakeUp;
-        }
-    }
-
-    if (mDisplayExtnIntf && doEarlyWakeUp) {
-        ATRACE_CALL();
-        // Notify Display Extn for GPU and Display Early Wakeup
-        mDisplayExtnIntf->NotifyEarlyWakeUp(true, true);
-    }
-#endif
 }
 
 void SurfaceFlinger::notifyDisplayUpdateImminent() {
@@ -8537,61 +8447,10 @@ void SurfaceFlinger::notifyDisplayUpdateImminent() {
         mPowerAdvisor->notifyDisplayUpdateImminent();
         return;
     }
-
-#ifdef EARLY_WAKEUP_FEATURE
-    bool doEarlyWakeUp = false;
-    {
-        // Synchronize the critical section.
-        std::lock_guard lock(mEarlyWakeUpMutex);
-        if (!mSendEarlyWakeUp) {
-            mSendEarlyWakeUp = mPowerAdvisor->canNotifyDisplayUpdateImminent();
-            doEarlyWakeUp = mSendEarlyWakeUp;
-        }
-    }
-
-    if (mDisplayExtnIntf && doEarlyWakeUp) {
-        ATRACE_CALL();
-
-        if (mInternalPresentationDisplays) {
-            // Notify Display Extn for GPU Early Wakeup only
-            mDisplayExtnIntf->NotifyEarlyWakeUp(true, false);
-            wakeUpPresentationDisplays = true;
-        } else {
-            // Notify Display Extn for GPU and Display Early Wakeup
-            mDisplayExtnIntf->NotifyEarlyWakeUp(true, true);
-        }
-    }
-#endif
 }
 
 void SurfaceFlinger::handlePresentationDisplaysEarlyWakeup(size_t updatingDisplays,
                                                            uint32_t layerStackId) {
-    // Filter-out the updating display(s) for early wake-up in Presentation mode.
-    if (mDisplayExtnIntf && mEarlyWakeUpEnabled && mInternalPresentationDisplays) {
-        ATRACE_CALL();
-        uint32_t hwcDisplayId;
-        bool internalDisplay = false;
-        bool singleUpdatingDisplay = (updatingDisplays == 1);
-
-        if (singleUpdatingDisplay) {
-            Mutex::Autolock lock(mStateLock);
-            const sp<DisplayDevice> display = findDisplay([layerStackId](const auto& display) {
-                    return display.getLayerStack().id == layerStackId;
-                });
-            internalDisplay = isInternalDisplay(display) && getHwcDisplayId(display, &hwcDisplayId);
-        }
-
-#ifdef EARLY_WAKEUP_FEATURE
-        if (!singleUpdatingDisplay) {
-            // Notify Display Extn for Early Wakeup of displays
-            mDisplayExtnIntf->NotifyEarlyWakeUp(false, true);
-        } else if (internalDisplay) {
-            // Notify Display Extn for Early Wakeup of given display
-            mDisplayExtnIntf->NotifyDisplayEarlyWakeUp(hwcDisplayId);
-        }
-#endif
-
-    }
     wakeUpPresentationDisplays = false;
 }
 
@@ -8672,47 +8531,6 @@ void SurfaceFlinger::NotifyResolutionSwitch(int displayId, int32_t width, int32_
                                             int32_t vsyncPeriod) {
 }
 
-void SurfaceFlinger::setupDisplayExtnFeatures() {
-#ifdef EARLY_WAKEUP_FEATURE
-    mEarlyWakeUpEnabled = false;
-    mDynamicSfIdleEnabled = false;
-    if (!mDisplayExtnIntf) {
-        return;
-    }
-
-    char propValue[PROPERTY_VALUE_MAX];
-    property_get("vendor.display.enable_early_wakeup", propValue, "0");
-    bool enableEarlyWakeUp = (atoi(propValue) == 1);
-
-    property_get("vendor.display.disable_dynamic_sf_idle", propValue, "0");
-    // TODO(b/204208295): idle timer was replaced with refresh rate configs
-    bool enableDynamicSfIdle = (atoi(propValue) == 0);
-
-    if (enableEarlyWakeUp || enableDynamicSfIdle) {
-        for (const auto& display : mDisplaysList) {
-            // Register Internal Physical Displays
-            if (isInternalDisplay(display)) {
-                uint32_t hwcDisplayId;
-                if (getHwcDisplayId(display, &hwcDisplayId)) {
-                    const auto displayId = DisplayId::fromValue<PhysicalDisplayId>( display->getId().value);
-                    if (displayId) {
-                        auto configId = getHwComposer().getActiveMode(displayId.value());
-                        LOG_ALWAYS_FATAL_IF(!configId, "HWC returned no active config");
-                        updateDisplayExtension(hwcDisplayId, *configId, true);
-                        if (enableDynamicSfIdle && display->isPrimary()) {
-                            setupIdleTimeoutHandling(hwcDisplayId);
-                        }
-                    }
-                }
-            }
-        }
-        mEarlyWakeUpEnabled = enableEarlyWakeUp;
-        mDynamicSfIdleEnabled = enableDynamicSfIdle;
-    }
-    ALOGI("Early Wakeup: %d, Dynamic SF Idle: %d", mEarlyWakeUpEnabled, mDynamicSfIdleEnabled);
-#endif
-}
-
 void SurfaceFlinger::setEarlyWakeUpConfig(const sp<DisplayDevice>& display, hal::PowerMode mode) {
     if (mEarlyWakeUpEnabled && isInternalDisplay(display)) {
         uint32_t hwcDisplayId;
@@ -8720,22 +8538,11 @@ void SurfaceFlinger::setEarlyWakeUpConfig(const sp<DisplayDevice>& display, hal:
             // Enable/disable Early Wake-up feature on a display based on its Power mode.
             bool enable = (mode == hal::PowerMode::ON) || (mode == hal::PowerMode::DOZE);
             ALOGV("setEarlyWakeUpConfig: Display: %d, Enable: %d", hwcDisplayId, enable);
-#ifdef DYNAMIC_EARLY_WAKEUP_CONFIG
-            if (mDisplayExtnIntf) {
-                mDisplayExtnIntf->SetEarlyWakeUpConfig(hwcDisplayId, enable);
-            }
-#endif
         }
     }
 }
 
 void SurfaceFlinger::setupIdleTimeoutHandling(uint32_t displayId) {
-#ifdef SMART_DISPLAY_CONFIG
-    if (mDisplayExtnIntf) {
-        bool isSmartConfig = mDisplayExtnIntf->IsSmartDisplayConfig(displayId);
-        mScheduler->handleIdleTimeout(isSmartConfig);
-    }
-#endif
 }
 
 void SurfaceFlinger::getModeFromFps(float fps,DisplayModePtr& outMode) {

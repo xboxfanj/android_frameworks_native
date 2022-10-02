@@ -100,7 +100,6 @@ namespace composer {
 class ComposerExtnIntf;
 class ComposerExtnLib;
 class FrameSchedulerIntf;
-class DisplayExtnIntf;
 } // namespace composer
 
 namespace composer {
@@ -1201,8 +1200,6 @@ private:
 
     void updateDisplayExtension(uint32_t displayId, uint32_t configId, bool connected);
 
-    void setDisplayExtnActiveConfig(uint32_t displayId, uint32_t activeConfigId);
-
     void notifyAllDisplaysUpdateImminent();
 
     void notifyDisplayUpdateImminent();
@@ -1213,11 +1210,7 @@ private:
 
     void createPhaseOffsetExtn();
 
-    void setupDisplayExtnFeatures();
-
     void setupIdleTimeoutHandling(uint32_t displayId);
-
-    bool isDisplayExtnEnabled() { return (mEarlyWakeUpEnabled || mDynamicSfIdleEnabled); }
 
     void setEarlyWakeUpConfig(const sp<DisplayDevice>& display, hal::PowerMode mode);
 
@@ -1567,7 +1560,6 @@ private:
 
     composer::ComposerExtnIntf *mComposerExtnIntf = nullptr;
     composer::FrameSchedulerIntf *mFrameSchedulerExtnIntf = nullptr;
-    composer::DisplayExtnIntf *mDisplayExtnIntf = nullptr;
     bool mHasScreenshot = false;
     float mThermalLevelFps = 0;
     float mLastCachedFps = 0;
