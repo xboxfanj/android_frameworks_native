@@ -45,8 +45,6 @@ cc_test {
     name: "libsurfaceflinger_unittest",
     defaults: [
         "libsurfaceflinger_mocks_defaults",
-        "libdisplayconfig_defaults",
-        "libdisplayconfigaidl_defaults",
         "skia_renderengine_deps",
         "surfaceflinger_defaults",
     ],

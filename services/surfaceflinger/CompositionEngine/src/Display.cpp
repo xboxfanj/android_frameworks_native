@@ -27,10 +27,6 @@
 #include <compositionengine/impl/OutputLayer.h>
 #include <compositionengine/impl/RenderSurface.h>
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-#include <config/client_interface.h>
-#endif
-
 #include <utils/Trace.h>
 
 // TODO(b/129481165): remove the #pragma below and fix conversion issues
@@ -49,10 +45,6 @@ using aidl::android::hardware::graphics::composer3::DisplayCapability;
 
 namespace android::compositionengine::impl {
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-::DisplayConfig::ClientInterface *mDisplayConfigIntf = nullptr;
-#endif
-
 std::shared_ptr<Display> createDisplay(
         const compositionengine::CompositionEngine& compositionEngine,
         const compositionengine::DisplayCreationArgs& args) {
@@ -67,14 +59,6 @@ void Display::setConfiguration(const compositionengine::DisplayCreationArgs& arg
     editState().isSecure = args.isSecure;
     editState().displaySpace.setBounds(args.pixels);
     setName(args.name);
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    int ret = ::DisplayConfig::ClientInterface::Create(args.name, nullptr, &mDisplayConfigIntf);
-    if (ret) {
-        ALOGE("DisplayConfig HIDL not present\n");
-        mDisplayConfigIntf = nullptr;
-    }
-#endif
-
     mDisplayExtnIntf = args.displayExtnIntf;
     ALOGI("Display::setConfiguration: mDisplayExtnIntf: %p", mDisplayExtnIntf);
 }
@@ -194,16 +178,6 @@ std::unique_ptr<compositionengine::OutputLayer> Display::createOutputLayer(
         ALOGE_IF(!hwcLayer, "Failed to create a HWC layer for a HWC supported display %s",
                  getName().c_str());
         outputLayer->setHwcLayer(std::move(hwcLayer));
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-        if (layerFE->getCompositionState()->outputFilter.toInternalDisplay && mDisplayConfigIntf) {
-            const auto physicalDisplayId = PhysicalDisplayId::tryCast(mId);
-            if (physicalDisplayId) {
-                const auto hwcDisplayId = hwc.fromPhysicalDisplayId(*physicalDisplayId);
-                mDisplayConfigIntf->SetLayerAsMask(static_cast<uint32_t>(*hwcDisplayId),
-                                                   outputLayer->getHwcLayer()->getId());
-            }
-        }
-#endif
     }
     return outputLayer;
 }

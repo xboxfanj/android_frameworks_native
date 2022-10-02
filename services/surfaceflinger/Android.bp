@@ -7,43 +7,6 @@ package {
     default_applicable_licenses: ["frameworks_native_license"],
 }
 
-soong_config_module_type {
-      name: "libdisplayconfig_cc_defaults",
-      module_type: "cc_defaults",
-      config_namespace: "qtidisplaycommonsys",
-      bool_variables: [
-          "displayconfig_enabled",
-      ],
-      properties: [
-          "cflags",
-          "srcs",
-          "shared_libs",
-      ],
-  }
-
-  libdisplayconfig_cc_defaults {
-      name: "libdisplayconfig_defaults",
-      soong_config_variables: {
-          displayconfig_enabled : {
-              cflags: [
-              "-Wno-unused-parameter",
-              "-DQTI_DISPLAY_CONFIG_ENABLED"
-              ],
-              shared_libs : ["libdisplayconfig.system.qti"]
-          }
-      }
-  }
-
-cc_defaults {
-    name: "libdisplayconfigaidl_defaults",
-    cflags: [
-       "-DAIDL_DISPLAY_CONFIG_ENABLED"
-    ],
-    shared_libs: [
-       "libbinder_ndk",
-    ],
-}
-
 cc_defaults {
     name: "surfaceflinger_defaults",
     cflags: [
@@ -63,8 +26,6 @@ cc_defaults {
     defaults: [
         "surfaceflinger_defaults",
         "skia_renderengine_deps",
-        "libdisplayconfig_defaults",
-        "libdisplayconfigaidl_defaults",
     ],
     cflags: [
         "-DLOG_TAG=\"SurfaceFlinger\"",

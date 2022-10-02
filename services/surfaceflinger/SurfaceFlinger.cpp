@@ -158,14 +158,6 @@
 #include "QtiGralloc.h"
 #include "layer_extn_intf.h"
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-#include <hardware/hwcomposer_defs.h>
-#include <config/client_interface.h>
-namespace DisplayConfig {
-class ClientInterface;
-}
-#endif
-
 #include <aidl/android/hardware/graphics/common/DisplayDecorationSupport.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
 #include <aidl/android/hardware/graphics/composer3/RenderIntent.h>
@@ -266,54 +258,6 @@ bool validateCompositionDataspace(Dataspace dataspace) {
     return dataspace == Dataspace::V0_SRGB || dataspace == Dataspace::DISPLAY_P3;
 }
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-class DisplayConfigCallbackHandler : public ::DisplayConfig::ConfigCallback {
-public:
-    DisplayConfigCallbackHandler(SurfaceFlinger& flinger) : mFlinger(flinger) {
-    }
-    void NotifyIdleStatus(bool is_idle) {
-      ALOGV("received idle notification");
-      ATRACE_CALL();
-      mFlinger.NotifyIdleStatus();
-    }
-  private:
-    SurfaceFlinger& mFlinger;
-};
-#endif
-
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-class DisplayConfigAidlCallbackHandler: public BnDisplayConfigCallback {
- public:
-    DisplayConfigAidlCallbackHandler(SurfaceFlinger& flinger) : mFlinger(flinger) {
-    }
-    virtual ndk::ScopedAStatus notifyCameraSmoothInfo(CameraSmoothOp op, int fps) {
-        return ndk::ScopedAStatus::ok();
-    }
-    virtual ndk::ScopedAStatus notifyCWBBufferDone(int32_t in_error,
-                               const ::aidl::android::hardware::common::NativeHandle& in_buffer) {
-        return ndk::ScopedAStatus::ok();
-    }
-    virtual ndk::ScopedAStatus notifyQsyncChange(bool in_qsyncEnabled, int32_t in_refreshRate,
-                                                 int32_t in_qsyncRefreshRate) {
-        return ndk::ScopedAStatus::ok();
-    }
-    virtual ndk::ScopedAStatus notifyIdleStatus(bool in_isIdle) {
-        return ndk::ScopedAStatus::ok();
-    }
-    virtual ndk::ScopedAStatus notifyResolutionChange(int32_t displayId, const Attributes& attr) {
-        ALOGV("received notification for resolution change");
-        ATRACE_CALL();
-        mFlinger.NotifyResolutionSwitch(displayId, attr.xRes, attr.yRes, attr.vsyncPeriod);
-        return ndk::ScopedAStatus::ok();
-    }
-    virtual ndk::ScopedAStatus notifyFpsMitigation(int32_t displayId, const Attributes& attr,
-                                                   Concurrency concurrency) {
-        return ndk::ScopedAStatus::ok();
-    }
- private:
-    SurfaceFlinger& mFlinger;
-};
-#endif
 struct IdleTimerConfig {
     int32_t timeoutMs;
     bool supportKernelIdleTimer;
@@ -378,17 +322,6 @@ Dataspace SurfaceFlinger::wideColorGamutCompositionDataspace = Dataspace::V0_SRG
 ui::PixelFormat SurfaceFlinger::wideColorGamutCompositionPixelFormat = ui::PixelFormat::RGBA_8888;
 bool SurfaceFlinger::sDirectStreaming;
 LatchUnsignaledConfig SurfaceFlinger::enableLatchUnsignaledConfig;
-
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-std::shared_ptr<IDisplayConfig> displayConfigIntf = nullptr;
-std::shared_ptr<DisplayConfigAidlCallbackHandler> mAidlCallbackHandler = nullptr;
-int64_t callbackClientId = -1;
-#endif
-
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-::DisplayConfig::ClientInterface *mDisplayConfigIntf = nullptr;
-DisplayConfigCallbackHandler *mDisplayConfigCallbackhandler = nullptr;
-#endif
 
 std::string decodeDisplayColorSetting(DisplayColorSetting displayColorSetting) {
     switch(displayColorSetting) {
@@ -664,51 +597,7 @@ SurfaceFlinger::SurfaceFlinger(Factory& factory) : SurfaceFlinger(factory, SkipI
         android::hardware::details::setTrebleTestingOverride(true);
     }
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    mDisplayConfigCallbackhandler = new DisplayConfigCallbackHandler(*this);
-    int ret = ::DisplayConfig::ClientInterface::Create("SurfaceFlinger"+std::to_string(0),
-                                                        mDisplayConfigCallbackhandler,
-                                                        &mDisplayConfigIntf);
-    if (ret || !mDisplayConfigIntf) {
-        ALOGE("DisplayConfig HIDL not present\n");
-        mDisplayConfigIntf = nullptr;
-    } else {
-        ALOGV("DisplayConfig HIDL is present\n");
-    }
-
-    if (mDisplayConfigIntf) {
-#ifdef DISPLAY_CONFIG_API_LEVEL_1
-        std::string value = "";
-        std::string qsync_prop = "enable_qsync_idle";
-        ret = mDisplayConfigIntf->GetDebugProperty(qsync_prop, &value);
-        ALOGI("enable_qsync_idle, ret:%d value:%s", ret, value.c_str());
-        if (!ret && (value == "1")) {
-          mDisplayConfigIntf->ControlIdleStatusCallback(true);
-        }
-#endif
-    }
-#endif
     mRefreshRateOverlaySpinner = property_get_bool("sf.debug.show_refresh_rate_overlay_spinner", 0);
-
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-    ndk::SpAIBinder binder(
-         AServiceManager_checkService("vendor.qti.hardware.display.config.IDisplayConfig/default"));
-
-    if (binder.get() == nullptr) {
-        ALOGE("DisplayConfig AIDL is not present");
-    } else {
-        displayConfigIntf = IDisplayConfig::fromBinder(binder);
-        if (displayConfigIntf == nullptr) {
-            ALOGE("Failed to retrieve DisplayConfig AIDL binder");
-        } else {
-            mAidlCallbackHandler = ndk::SharedRefBase::make<DisplayConfigAidlCallbackHandler>(*this);
-            displayConfigIntf->registerCallback(mAidlCallbackHandler, &callbackClientId);
-            if (callbackClientId >= 0) {
-               ALOGI("Registered to displayconfig aidl service and enabled callback");
-            }
-        }
-    }
-#endif
 
     if (!mIsUserBuild && base::GetBoolProperty("debug.sf.enable_transaction_tracing"s, true)) {
         mTransactionTracing.emplace();
@@ -730,12 +619,6 @@ LatchUnsignaledConfig SurfaceFlinger::getLatchUnsignaledConfig() {
 }
 
 SurfaceFlinger::~SurfaceFlinger() {
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-    if (displayConfigIntf && callbackClientId >= 0) {
-        displayConfigIntf->unRegisterCallback(callbackClientId);
-        callbackClientId = -1;
-    }
-#endif
 }
 
 void SurfaceFlinger::binderDied(const wp<IBinder>&) {
@@ -1058,14 +941,6 @@ void SurfaceFlinger::init() {
             "Initializing graphics H/W...");
     Mutex::Autolock _l(mStateLock);
 
-#if defined(QTI_DISPLAY_CONFIG_ENABLED) && defined(AIDL_DISPLAY_CONFIG_ENABLED)
-    if (!mDisplayConfigIntf && !displayConfigIntf) {
-        ALOGW("DisplayConfig HIDL and AIDL are both unavailable - disabling composer extensions");
-    } else {
-        ALOGV("Initializing composer extension interface");
-        InitComposerExtn();
-    }
-#endif
     // Get a RenderEngine for the given display / config (can't fail)
     // TODO(b/77156734): We need to stop casting and use HAL types when possible.
     // Sending maxFrameBufferAcquiredBuffers as the cache size is tightly tuned to single-display.
@@ -1114,16 +989,6 @@ void SurfaceFlinger::init() {
     const auto displayId = display->getPhysicalId();
     LOG_ALWAYS_FATAL_IF(!getHwComposer().isConnected(displayId),
                         "Primary display is disconnected.");
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    if (!mDisplayConfigIntf) {
-        ALOGE("DisplayConfig HIDL not present\n");
-        mDisplayConfigIntf = nullptr;
-    } else {
-        mDisplayConfigIntf->IsAsyncVDSCreationSupported(&mAsyncVdsCreationSupported);
-        ALOGI("IsAsyncVDSCreationSupported %d", mAsyncVdsCreationSupported);
-    }
-#endif
-
     // initialize our drawing state
     mDrawingState = mCurrentState;
 
@@ -2012,30 +1877,6 @@ status_t SurfaceFlinger::isSupportedConfigSwitch(const sp<IBinder>& displayToken
                displayToken.get());
         return NAME_NOT_FOUND;
     }
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-    if (displayConfigIntf != nullptr) {
-        const auto displayId = PhysicalDisplayId::tryCast(display->getId());
-        const auto hwcDisplayId = getHwComposer().fromPhysicalDisplayId(*displayId);
-        bool supported = false;
-        displayConfigIntf->isSupportedConfigSwitch(*hwcDisplayId, config, &supported);
-        if (!supported) {
-            ALOGW("AIDL Switching to config:%d is not supported", config);
-            return INVALID_OPERATION;
-        } else {
-            ALOGI("AIDL Switching to config:%d is supported", config);
-        }
-    }
-#elif defined(QTI_DISPLAY_CONFIG_ENABLED)
-    const auto displayId = display->getId();
-    const auto hwcDisplayId = getHwComposer().fromPhysicalDisplayId(*displayId);
-    bool supported = false;
-    mDisplayConfigIntf->IsSupportedConfigSwitch(*hwcDisplayId, config, &supported);
-    if (!supported) {
-        ALOGW("HIDL Switching to config:%d is not supported", config);
-        return INVALID_OPERATION;
-    }
-#endif
-
     return NO_ERROR;
 }
 
@@ -2087,20 +1928,6 @@ status_t SurfaceFlinger::isDeviceRCSupported(const sp<IBinder>& displayToken,
     static int read_rc_supported = true;
     if (read_rc_supported) {
         read_rc_supported = false;
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-        ::DisplayConfig::ClientInterface *DisplayConfigIntf = nullptr;
-        ::DisplayConfig::ClientInterface::Create("SurfaceFlinger::Layer" + std::to_string(0),
-              nullptr, &DisplayConfigIntf);
-        if (DisplayConfigIntf) {
-            std::string value = "0";
-            std::string rc_prop = "enable_rc_support";
-            int ret = DisplayConfigIntf->GetDebugProperty(rc_prop, &value);
-            if (!ret && (value == "1")) {
-                DisplayConfigIntf->IsRCSupported(0, &rc_supported);
-            }
-            ::DisplayConfig::ClientInterface::Destroy(DisplayConfigIntf);
-        }
-#endif  // QTI_DISPLAY_CONFIG_ENABLED
     }
    *outDeviceRCSupported = rc_supported;
     return NO_ERROR;
@@ -3064,19 +2891,6 @@ void SurfaceFlinger::setDisplayAnimating() {
             }
         }
     }
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    for (const auto& [token, displayDevice] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
-        if (!IsDisplayExternalOrVirtual(displayDevice)) {
-           continue;
-        }
-        uint32_t hwcDisplayId;
-        getHwcDisplayId(displayDevice, &hwcDisplayId);
-        if (mDisplayConfigIntf && (hasScreenshot != mHasScreenshot)) {
-           mDisplayConfigIntf->SetDisplayAnimating(hwcDisplayId, hasScreenshot);
-           mHasScreenshot = hasScreenshot;
-        }
-    }
-#endif
 }
 
 bool SurfaceFlinger::IsDisplayExternalOrVirtual(const sp<DisplayDevice>& displayDevice) {
@@ -4045,19 +3859,6 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
         initScheduler(display);
     }
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    bool supported = false;
-    const auto physicalDisplayId = PhysicalDisplayId::tryCast(display->getId());
-    if (physicalDisplayId) {
-        const auto hwcDisplayId = getHwComposer().fromPhysicalDisplayId(*physicalDisplayId);
-        if (mDisplayConfigIntf) {
-            mDisplayConfigIntf->IsPowerModeOverrideSupported(*hwcDisplayId, &supported);
-        }
-    }
-    if (supported) {
-      display->setPowerModeOverrideConfig(true);
-    }
-#endif
     if (!state.isVirtual()) {
         if (mPluggableVsyncPrioritized && !isInternalDisplay(display)) {
             // Insert the pluggable display just before the first built-in display
@@ -5532,22 +5333,6 @@ void SurfaceFlinger::checkVirtualDisplayHint(const Vector<DisplayState>& display
                     int format = 0;
                     status = s.surface->query(NATIVE_WINDOW_FORMAT, &format);
                     ALOGE_IF(status != NO_ERROR, "Unable to query format (%d)", status);
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-                    size_t maxVirtualDisplaySize =
-                        getHwComposer().getMaxVirtualDisplayDimension();
-                    if ((mDisplayConfigIntf) && (maxVirtualDisplaySize == 0 ||
-                        ((uint64_t)width <= maxVirtualDisplaySize &&
-                        (uint64_t)height <= maxVirtualDisplaySize))) {
-                        uint64_t usage = 0;
-                        // Replace with native_window_get_consumer_usage ?
-                        status = s.surface->getConsumerUsage(&usage);
-                        ALOGW_IF(status != NO_ERROR, "Unable to query usage (%d)", status);
-                        if ((status == NO_ERROR) && canAllocateHwcDisplayIdForVDS(usage)) {
-                            mDisplayConfigIntf->CreateVirtualDisplay(width, height, format);
-                            return;
-                        }
-                    }
-#endif
                 }
             }
         }
@@ -6364,55 +6149,7 @@ void SurfaceFlinger::setPowerMode(const sp<IBinder>& displayToken, int mode) {
          return;
     }
 
-#ifdef QTI_DISPLAY_CONFIG_ENABLED
-    if (mode < 0 || mode > (int)hal::PowerMode::DOZE_SUSPEND) {
-        ALOGW("Attempt to set invalid power mode %d", mode);
-        return;
-    }
-
-    hal::PowerMode power_mode = static_cast<hal::PowerMode>(mode);
-    const auto displayId = display->getId();
-    const auto physicalDisplayId = PhysicalDisplayId::tryCast(displayId);
-    if (!physicalDisplayId) {
-      return;
-    }
-    const auto hwcDisplayId = getHwComposer().fromPhysicalDisplayId(*physicalDisplayId);
-    const hal::PowerMode currentDisplayPowerMode = display->getPowerMode();
-    const hal::PowerMode newDisplayPowerMode = static_cast<hal::PowerMode>(mode);
-    // Fallback to default power state behavior as HWC does not support power mode override.
-    if (!display->getPowerModeOverrideConfig() ||
-        !((currentDisplayPowerMode  ==  hal::PowerMode::OFF &&
-        newDisplayPowerMode == hal::PowerMode::ON) ||
-        (currentDisplayPowerMode  ==  hal::PowerMode::ON &&
-        newDisplayPowerMode == hal::PowerMode::OFF))) {
-        setPowerModeOnMainThread(displayToken, mode);
-        return;
-    }
-
-    ::DisplayConfig::PowerMode hwcMode = ::DisplayConfig::PowerMode::kOff;
-    if (power_mode == hal::PowerMode::ON) {
-        hwcMode = ::DisplayConfig::PowerMode::kOn;
-    }
-
-    bool step_up = false;
-    if (currentDisplayPowerMode == hal::PowerMode::OFF &&
-        newDisplayPowerMode == hal::PowerMode::ON) {
-        step_up = true;
-    }
-    // Change hardware state first while stepping up.
-    if (step_up) {
-        mDisplayConfigIntf->SetPowerMode(*hwcDisplayId, hwcMode);
-    }
-    // Change SF state now.
     setPowerModeOnMainThread(displayToken, mode);
-    // Change hardware state now while stepping down.
-
-    if (!step_up) {
-        mDisplayConfigIntf->SetPowerMode(*hwcDisplayId, hwcMode);
-    }
-#else
-    setPowerModeOnMainThread(displayToken, mode);
-#endif
 }
 
 status_t SurfaceFlinger::doDump(int fd, const DumpArgs& args, bool asProto) {
@@ -7827,38 +7564,6 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                         setPowerMode(getPhysicalDisplayToken(dispId.value()), mode);
                     }
                 } else {
-#if defined(QTI_DISPLAY_CONFIG_ENABLED) && defined(DISPLAY_CONFIG_TILE_DISPLAY_APIS_1_0)
-                    ::DisplayConfig::PowerMode hwcMode = ::DisplayConfig::PowerMode::kOff;
-                    switch (power_mode) {
-                        case hal::PowerMode::DOZE:
-                            hwcMode = ::DisplayConfig::PowerMode::kDoze;
-                            break;
-                        case hal::PowerMode::ON:
-                            hwcMode = ::DisplayConfig::PowerMode::kOn;
-                            break;
-                        case hal::PowerMode::DOZE_SUSPEND:
-                            hwcMode = ::DisplayConfig::PowerMode::kDozeSuspend;
-                            break;
-                        default:
-                            break;
-                    }
-                    // A regular display has one h tile and one v tile.
-                    mDisplayConfigIntf->GetDisplayTileCount(disp, &num_h_tiles, &num_v_tiles);
-                    if (((num_h_tiles * num_v_tiles) < 2) || tile_h_loc >= num_h_tiles
-                        || tile_v_loc >= num_v_tiles) {
-                        ALOGE("Debug: Display %llu has only %u h tiles and %u v tiles. Not a true "
-                              "tile display or invalid tile h or v locations given.",
-                              (unsigned long long)disp, num_h_tiles, num_v_tiles);
-                    } else {
-                        err = mDisplayConfigIntf->SetPowerModeTiled(disp, hwcMode, tile_h_loc,
-                                                                    tile_v_loc);
-                        if (NO_ERROR != err) {
-                            ALOGE("Debug: DisplayConfig::SetPowerModeTiled() returned error %d",
-                                  err);
-                            break;
-                        }
-                    }
-#endif
                     ALOGI("Debug: Set display = %llu, power mode = %d at tile h loc = %d, tile v "
                           "loc = %d (Has %u h tiles and %u v tiles)", (unsigned long long)disp,
                           mode, tile_h_loc, tile_v_loc, num_h_tiles, num_v_tiles);
@@ -7899,24 +7604,6 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                                              brightness);
                     }
                 } else {
-#if defined(QTI_DISPLAY_CONFIG_ENABLED) && defined(DISPLAY_CONFIG_TILE_DISPLAY_APIS_1_0)
-                    // A regular display has one h tile and one v tile.
-                    mDisplayConfigIntf->GetDisplayTileCount(disp, &num_h_tiles, &num_v_tiles);
-                    if (((num_h_tiles * num_v_tiles) < 2) || tile_h_loc >= num_h_tiles
-                        || tile_v_loc >= num_v_tiles) {
-                        ALOGE("Debug: Display %llu has only %u h tiles and %u v tiles. Not a true "
-                              "tile display or invalid tile h or v locations given.",
-                              (unsigned long long)disp, num_h_tiles, num_v_tiles);
-                    } else {
-                        err = mDisplayConfigIntf->SetPanelBrightnessTiled(disp, level, tile_h_loc,
-                                                                          tile_v_loc);
-                        if (NO_ERROR != err) {
-                            ALOGE("Debug: DisplayConfig::SetPanelBrightnessTiled() returned error "
-                                  "%d", err);
-                            break;
-                        }
-                    }
-#endif
                     ALOGI("Debug: Set display = %llu, brightness level = %d/255 (%0.2ff) at tile h "
                           "loc = %d, tile v loc = %d (Has %u h tiles and %u v tiles)",
                           (unsigned long long)disp, level, levelf, tile_h_loc, tile_v_loc,
@@ -7939,26 +7626,6 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                 }
                 ALOGI("Debug: Set display = %llu, wider-mode preference = %d",
                       (unsigned long long)disp, pref);
-#if defined(QTI_DISPLAY_CONFIG_ENABLED) && defined(DISPLAY_CONFIG_TILE_DISPLAY_APIS_1_0)
-                ::DisplayConfig::WiderModePref wider_mode_pref =
-                    ::DisplayConfig::WiderModePref::kNoPreference;
-                switch (pref) {
-                    case 1:
-                        wider_mode_pref = ::DisplayConfig::WiderModePref::kWiderAsyncMode;
-                        break;
-                    case 2:
-                        wider_mode_pref = ::DisplayConfig::WiderModePref::kWiderSyncMode;
-                        break;
-                    default:
-                        // Use default DisplayConfig::WiderModePref::kNoPreference.
-                        break;
-                }
-                err = mDisplayConfigIntf->SetWiderModePreference(disp, wider_mode_pref);
-                if (NO_ERROR != err) {
-                    ALOGE("Debug: DisplayConfig::SetWiderModePreference() returned error %d", err);
-                    break;
-                }
-#endif
                 return NO_ERROR;
             }
         }
@@ -9366,47 +9033,6 @@ void SurfaceFlinger::NotifyIdleStatus() {
 
 void SurfaceFlinger::NotifyResolutionSwitch(int displayId, int32_t width, int32_t height,
                                             int32_t vsyncPeriod) {
-#ifdef AIDL_DISPLAY_CONFIG_ENABLED
-    const auto dispId = getInternalDisplayId();
-    if (!dispId) {
-        ALOGE("No internal display found.");
-        return;
-    }
-
-    sp<IBinder> displayToken = getPhysicalDisplayToken(*dispId);
-    sp<DisplayDevice> display = nullptr;
-    {
-        Mutex::Autolock lock(mStateLock);
-        display = (getDisplayDeviceLocked(displayToken));
-    }
-    if (!display) {
-        ALOGE("Attempt to notify resolution switch for invalid display token %p",
-               displayToken.get());
-        return;
-    }
-
-    const auto& supportedModes = display->getSupportedModes();
-    int32_t newModeId;
-    for (const auto& [id, mode] : supportedModes) {
-
-        auto modeWidth = mode->getWidth();
-        auto modeHeight = mode->getHeight();
-        const int32_t modePeriod = static_cast<int32_t>(mode->getVsyncPeriod());
-
-        if (modeWidth == width && modeHeight == height && vsyncPeriod == modePeriod) {
-            newModeId = static_cast<int32_t>(mode->getId().value());
-            break;
-        }
-    }
-
-    if(isSupportedConfigSwitch(displayToken, newModeId) != NO_ERROR) {
-        return;
-    }
-    status_t result = setActiveModeFromBackdoor(displayToken, newModeId);
-    if (result != NO_ERROR) {
-        return;
-    }
-#endif
 }
 
 void SurfaceFlinger::setupDisplayExtnFeatures() {
