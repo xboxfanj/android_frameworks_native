@@ -1133,20 +1133,6 @@ status_t SurfaceFlinger::getDisplayStats(const sp<IBinder>&, DisplayStatInfo* st
     return NO_ERROR;
 }
 
-bool SurfaceFlinger::isFpsDeferNeeded(const ActiveModeInfo& info) {
-    const auto display = getDefaultDisplayDeviceLocked();
-    if (!display || !mThermalLevelFps) {
-        return false;
-    }
-    // TODO(b/226947083) QC value-adds were deleted here due to change in
-    // datatype
-    if (mAllowThermalFpsChange) {
-        return false;
-    }
-
-    return false;
-}
-
 void SurfaceFlinger::setDesiredActiveMode(const ActiveModeInfo& info) {
     ATRACE_CALL();
 
@@ -1157,11 +1143,6 @@ void SurfaceFlinger::setDesiredActiveMode(const ActiveModeInfo& info) {
     auto display = getDisplayDeviceLocked(info.mode->getPhysicalDisplayId());
     if (!display) {
         ALOGW("%s: display is no longer valid", __func__);
-        return;
-    }
-
-
-    if (isFpsDeferNeeded(info)) {
         return;
     }
 
