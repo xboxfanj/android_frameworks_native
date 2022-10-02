@@ -267,7 +267,6 @@ public:
     virtual Error getClientTargetProperty(
             Display display, V3_0::ClientTargetPropertyWithBrightness* outClientTargetProperty) = 0;
 
-    virtual Error setDisplayElapseTime(Display display, uint64_t timeStamp) = 0;
     // AIDL Composer
     virtual Error setLayerBrightness(Display display, Layer layer, float brightness) = 0;
     virtual Error setLayerBlockingRegion(Display display, Layer layer,

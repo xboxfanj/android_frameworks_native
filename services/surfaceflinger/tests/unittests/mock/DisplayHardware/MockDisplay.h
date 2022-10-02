@@ -93,7 +93,6 @@ public:
     MOCK_METHOD1(getClientTargetProperty, hal::Error(hal::ClientTargetProperty*));
     MOCK_CONST_METHOD1(getConnectionType, hal::Error(android::DisplayConnectionType*));
     MOCK_CONST_METHOD0(isVsyncPeriodSwitchSupported, bool());
-    MOCK_METHOD1(setDisplayElapseTime, hal::Error(uint64_t));
 };
 
 } // namespace android::Hwc2::mock

@@ -1620,27 +1620,6 @@ status_t SurfaceFlinger::setDisplayContentSamplingEnabled(const sp<IBinder>& dis
     return future.get();
 }
 
-status_t SurfaceFlinger::setDisplayElapseTime(const sp<DisplayDevice>& display,
-    std::chrono::steady_clock::time_point earliestPresentTime) const {
-    nsecs_t sfOffset = mVsyncConfiguration->getCurrentConfigs().late.sfOffset;
-    if (!mUseAdvanceSfOffset || (sfOffset >= 0)) {
-        return OK;
-    }
-
-    if (mDisplaysList.size() != 1 || display->isVirtual()) {
-        // Revisit this for multi displays.
-        return OK;
-    }
-
-    auto timeStamp =
-      std::chrono::time_point_cast<std::chrono::nanoseconds>(earliestPresentTime);
-    const auto id = HalDisplayId::tryCast(display->getId());
-    if (!id) {
-        return BAD_VALUE;
-    }
-    return getHwComposer().setDisplayElapseTime(*id, timeStamp.time_since_epoch().count());
-}
-
 status_t SurfaceFlinger::isSupportedConfigSwitch(const sp<IBinder>& displayToken, int config) {
     sp<DisplayDevice> display = nullptr;
     {
@@ -2475,9 +2454,6 @@ void SurfaceFlinger::composite(nsecs_t frameTime, int64_t vsyncId)
     dumpDrawCycle(true);
     {
       Mutex::Autolock lock(mStateLock);
-      for (const auto& [_, display] : mDisplays) {
-           setDisplayElapseTime(display, refreshArgs.earliestPresentTime);
-      }
     }
     mCompositionEngine->present(refreshArgs);
 

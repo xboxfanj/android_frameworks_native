@@ -218,17 +218,6 @@ bool AidlComposer::isDeclared(const std::string& serviceName) {
     return AServiceManager_isDeclared(instance(serviceName).c_str());
 }
 
-void AidlComposer::AidlCommandWriter::setDisplayElapseTime(uint64_t time)
-{
-    constexpr uint16_t kSetDisplayElapseTimeLength = 2;
-    //TODO(b/215740085): Refactoring in AidlComposerHal requires changes
-    /* beginCommand(static_cast<V2_1::IComposerClient::Command>(
-                         IQtiComposerClient::Command::SET_DISPLAY_ELAPSE_TIME),
-                 kSetDisplayElapseTimeLength);
-    write64(time);
-    endCommand(); */
-}
-
 AidlComposer::AidlComposer(const std::string& serviceName) : mWriter() {
     // This only waits if the service is actually declared
     mAidlComposer = AidlIComposer::fromBinder(
@@ -764,16 +753,6 @@ Error AidlComposer::setLayerVisibleRegion(Display display, Layer layer,
 
 Error AidlComposer::setLayerZOrder(Display display, Layer layer, uint32_t z) {
     mWriter.setLayerZOrder(translate<int64_t>(display), translate<int64_t>(layer), z);
-    return Error::NONE;
-}
-
-Error AidlComposer::setDisplayElapseTime(Display display, uint64_t timeStamp) {
-    //TODO(b/215740085): Refactoring in AidlComposerHal requires changes
-    //selectDisplay is not available any more, replaced by setLayerPerFrameMetadata
-    //For example: mWriter.setLayerPerFrameMetadata(translate<int64_t>(display),
-    //translate<int64_t>(layer),translate<AidlPerFrameMetadata>(perFrameMetadatas));
-    //mWriter.selectDisplay(translate<int64_t>(display));
-    mWriter.setDisplayElapseTime(timeStamp);
     return Error::NONE;
 }
 

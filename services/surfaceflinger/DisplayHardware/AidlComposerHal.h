@@ -185,7 +185,6 @@ public:
             const std::vector<IComposerClient::PerFrameMetadataBlob>& metadata) override;
     Error setDisplayBrightness(Display display, float brightness, float brightnessNits,
                                const DisplayBrightnessOptions& options) override;
-    Error setDisplayElapseTime(Display display, uint64_t timeStamp) override;
 
     // Composer HAL 2.4
     Error getDisplayCapabilities(
@@ -235,7 +234,6 @@ private:
               : ComposerClientWriter() {}
         ~AidlCommandWriter() override {}
 
-        void setDisplayElapseTime(uint64_t time);
     };
 
     // Many public functions above simply write a command into the command

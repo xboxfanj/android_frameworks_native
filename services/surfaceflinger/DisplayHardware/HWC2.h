@@ -169,7 +169,6 @@ public:
     [[nodiscard]] virtual hal::Error setIdleTimerEnabled(std::chrono::milliseconds timeout) = 0;
     [[nodiscard]] virtual hal::Error getPhysicalDisplayOrientation(
             Hwc2::AidlTransform* outTransform) const = 0;
-    [[clang::warn_unused_result]] virtual hal::Error setDisplayElapseTime(uint64_t timeStamp) = 0;
 };
 
 namespace impl {
@@ -250,7 +249,6 @@ public:
                     support) override;
     hal::Error setIdleTimerEnabled(std::chrono::milliseconds timeout) override;
 
-    hal::Error setDisplayElapseTime(uint64_t timeStamp) override;
     // Other Display methods
     hal::HWDisplayId getId() const override { return mId; }
     bool isConnected() const override { return mIsConnected; }

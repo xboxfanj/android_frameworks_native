@@ -294,7 +294,6 @@ public:
             const std::vector<IComposerClient::PerFrameMetadataBlob>& metadata) override;
     Error setDisplayBrightness(Display display, float brightness, float brightnessNits,
                                const DisplayBrightnessOptions& options) override;
-    Error setDisplayElapseTime(Display display, uint64_t timeStamp) override;
 
     // Composer HAL 2.4
     Error getDisplayCapabilities(
@@ -345,7 +344,6 @@ private:
         explicit CommandWriter(uint32_t initialMaxSize) : CommandWriterBase(initialMaxSize) {}
         ~CommandWriter() override {}
 
-        void setDisplayElapseTime(uint64_t time);
     };
 
     void registerCallback(const sp<IComposerCallback>& callback);

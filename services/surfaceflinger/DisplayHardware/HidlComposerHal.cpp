@@ -189,16 +189,6 @@ std::vector<To> translate(const hidl_vec<From>& in) {
 
 } // anonymous namespace
 
-void HidlComposer::CommandWriter::setDisplayElapseTime(uint64_t time)
-{
-    constexpr uint16_t kSetDisplayElapseTimeLength = 2;
-    beginCommand(static_cast<V2_1::IComposerClient::Command>(
-                         IQtiComposerClient::Command::SET_DISPLAY_ELAPSE_TIME),
-                 kSetDisplayElapseTimeLength);
-    write64(time);
-    endCommand();
-}
-
 HidlComposer::HidlComposer(const std::string& serviceName) : mWriter(kWriterInitialSize) {
     mComposer = V2_1::IComposer::getService(serviceName);
 
@@ -620,13 +610,6 @@ Error HidlComposer::setOutputBuffer(Display display, const native_handle_t* buff
                                     int releaseFence) {
     mWriter.selectDisplay(display);
     mWriter.setOutputBuffer(0, buffer, dup(releaseFence));
-    return Error::NONE;
-}
-
-Error HidlComposer::setDisplayElapseTime(Display display, uint64_t timeStamp)
-{
-    mWriter.selectDisplay(display);
-    mWriter.setDisplayElapseTime(timeStamp);
     return Error::NONE;
 }
 

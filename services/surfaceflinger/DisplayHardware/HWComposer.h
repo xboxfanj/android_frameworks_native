@@ -279,7 +279,6 @@ public:
     virtual Hwc2::AidlTransform getPhysicalDisplayOrientation(PhysicalDisplayId) const = 0;
 
     virtual std::optional<hal::HWDisplayId> fromVirtualDisplayId(HalVirtualDisplayId) const = 0;
-    virtual status_t setDisplayElapseTime(HalDisplayId displayId, uint64_t timeStamp) = 0;
 };
 
 static inline bool operator==(const android::HWComposer::DeviceRequestedChanges& lhs,
@@ -388,7 +387,6 @@ public:
 
     bool onVsync(hal::HWDisplayId, int64_t timestamp) override;
     void setVsyncEnabled(PhysicalDisplayId, hal::Vsync enabled) override;
-    status_t setDisplayElapseTime(HalDisplayId displayId, uint64_t timeStamp) override;
 
     bool isConnected(PhysicalDisplayId) const override;
 
