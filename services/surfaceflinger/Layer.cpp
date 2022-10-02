@@ -447,9 +447,6 @@ void Layer::prepareGeometryCompositionState() {
     compositionState->geomBufferUsesDisplayInverseTransform = getTransformToDisplayInverse();
     compositionState->geomUsesSourceCrop = usesSourceCrop();
     compositionState->isSecure = isSecure();
-    compositionState->isSecureDisplay = isSecureDisplay();
-    compositionState->isSecureCamera = isSecureCamera();
-    compositionState->isScreenshot = isScreenshot();
 
     compositionState->metadata.clear();
     const auto& supportedMetadata = mFlinger->getHwComposer().getSupportedLayerGenericMetadata();
@@ -705,23 +702,6 @@ bool Layer::isSecure() const {
     return (p != nullptr) ? p->isSecure() : false;
 }
 
-bool Layer::isSecureDisplay() const {
-    sp<const GraphicBuffer> buffer = getBuffer();
-    return buffer && (buffer->getUsage() & GRALLOC_USAGE_PRIVATE_SECURE_DISPLAY);
-}
-
-bool Layer::isSecureCamera() const {
-    sp<const GraphicBuffer> buffer = getBuffer();
-    bool protected_buffer = buffer && (buffer->getUsage() & BufferUsage::PROTECTED);
-    bool camera_output = buffer && (buffer->getUsage() & BufferUsage::CAMERA_OUTPUT);
-    return protected_buffer && camera_output;
-}
-
-bool Layer::isScreenshot() const {
-    return ((getName().find("ScreenshotSurface") != std::string::npos) ||
-            (getName().find("RotationLayer") != std::string::npos) ||
-            (getName().find("BackColorSurface") != std::string::npos));
-}
 // ----------------------------------------------------------------------------
 // transaction
 // ----------------------------------------------------------------------------

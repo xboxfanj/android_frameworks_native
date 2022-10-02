@@ -666,10 +666,6 @@ public:
      */
     bool isSecure() const;
 
-    bool isSecureCamera() const;
-    bool isSecureDisplay() const;
-    bool isScreenshot() const;
-
     /*
      * isHiddenByPolicy - true if this layer has been forced invisible.
      * just because this is false, doesn't mean isVisible() is true.

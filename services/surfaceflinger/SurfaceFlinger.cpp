@@ -2582,16 +2582,7 @@ void SurfaceFlinger::setDisplayAnimating() {
            continue;
         }
         const auto display = displayDevice->getCompositionDisplay();
-        for (const auto& layer : mDrawingState.layersSortedByZ) {
-            // only consider the layers on the given layer stack
-            if (layer->getLayerStack() == displayDevice->getLayerStack()) {
-               hasScreenshot |= layer->isScreenshot();
-            }
-        }
         auto layers = displayDevice->getCompositionDisplay()->getOutputLayersOrderedByZ();
-        hasScreenshot |= std::any_of(layers.begin(), layers.end(), [](auto* layer) {
-                                    return layer->getLayerFE().getCompositionState()->isScreenshot;
-                                    });
     }
 
     for (auto& layer : mLayersPendingRefresh) {
@@ -2599,9 +2590,6 @@ void SurfaceFlinger::setDisplayAnimating() {
             auto display = displayDevice->getCompositionDisplay();
             if (!IsDisplayExternalOrVirtual(displayDevice)) {
                continue;
-            }
-            if (display->includesLayer(layer->getOutputFilter())) {
-               hasScreenshot |= layer->isScreenshot();
             }
         }
     }
@@ -7613,8 +7601,7 @@ ftl::SharedFuture<FenceResult> SurfaceFlinger::captureScreenCommon(
             bool protectedLayerFound = false;
             traverseLayers([&](Layer* layer) {
                 protectedLayerFound = protectedLayerFound ||
-                        (layer->isVisible() && layer->isProtected() &&
-                         !layer->isSecureCamera() && !layer->isSecureDisplay());
+                        (layer->isVisible() && layer->isProtected());
             });
             return protectedLayerFound;
         });
@@ -7791,9 +7778,6 @@ ftl::SharedFuture<FenceResult> SurfaceFlinger::renderScreenImpl(
     std::vector<Layer*> renderedLayers;
     bool disableBlurs = false;
     traverseLayers([&](Layer* layer) {
-        if (layer->isSecureDisplay()) {
-            return;
-        }
         disableBlurs |= layer->getDrawingState().sidebandStream != nullptr;
 
         Region clip(renderArea.getBounds());
