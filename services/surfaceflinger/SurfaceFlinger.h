@@ -625,8 +625,6 @@ private:
                                        DisplayedFrameStats* outStats) const override;
     status_t getProtectedContentSupport(bool* outSupported) const override;
     status_t isWideColorDisplay(const sp<IBinder>& displayToken, bool* outIsWideColorDisplay) const;
-    status_t isDeviceRCSupported(const sp<IBinder>& displayToken,
-                                 bool* outDeviceRCSupported) const override;
     status_t addRegionSamplingListener(const Rect& samplingArea, const sp<IBinder>& stopLayerHandle,
                                        const sp<IRegionSamplingListener>& listener) override;
     status_t removeRegionSamplingListener(const sp<IRegionSamplingListener>& listener) override;

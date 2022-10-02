@@ -303,18 +303,6 @@ void BLASTBufferQueue::update(const sp<SurfaceControl>& surface, uint32_t width,
        sp<SurfaceComposerClient> client = mSurfaceControl->getClient();
        if (client != nullptr) {
            const sp<IBinder> display = client->getInternalDisplayToken();
-           if (display != nullptr) {
-               bool isDeviceRCSupported = false;
-               status_t err = client->isDeviceRCSupported(display, &isDeviceRCSupported);
-               if (!err && isDeviceRCSupported) {
-                   // retain original flags and append SW Flags
-                   uint64_t usage = GraphicBuffer::USAGE_HW_COMPOSER |
-                                    GraphicBuffer::USAGE_HW_TEXTURE |
-                                    GraphicBuffer::USAGE_SW_READ_RARELY |
-                                    GraphicBuffer::USAGE_SW_WRITE_RARELY;
-                   mConsumer->setConsumerUsageBits(usage);
-                }
-            }
         }
     }
 }
