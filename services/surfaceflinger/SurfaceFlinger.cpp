@@ -156,7 +156,6 @@
 
 #include "smomo_interface.h"
 #include "QtiGralloc.h"
-#include "layer_extn_intf.h"
 
 #include <aidl/android/hardware/graphics/common/DisplayDecorationSupport.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
@@ -372,45 +371,6 @@ void SurfaceFlinger::setRefreshRates(const sp<DisplayDevice>& display) {
             continue;
         }
         smoMo->SetDisplayRefreshRates(refreshRates);
-    }
-}
-
-bool LayerExtWrapper::init() {
-    mLayerExtLibHandle = dlopen(LAYER_EXTN_LIBRARY_NAME, RTLD_NOW);
-    if (!mLayerExtLibHandle) {
-        ALOGE("Unable to open layer ext lib: %s", dlerror());
-        return false;
-    }
-
-    mLayerExtCreateFunc =
-        reinterpret_cast<CreateLayerExtnFuncPtr>(dlsym(mLayerExtLibHandle,
-            CREATE_LAYER_EXTN_INTERFACE));
-    mLayerExtDestroyFunc =
-        reinterpret_cast<DestroyLayerExtnFuncPtr>(dlsym(mLayerExtLibHandle,
-            DESTROY_LAYER_EXTN_INTERFACE));
-
-    if (!mLayerExtCreateFunc || !mLayerExtDestroyFunc) {
-        ALOGE("Can't load layer ext symbols: %s", dlerror());
-        dlclose(mLayerExtLibHandle);
-        return false;
-    }
-
-    if (!mLayerExtCreateFunc(LAYER_EXTN_VERSION_TAG, &mInst)) {
-        ALOGE("Unable to create layer ext interface");
-        dlclose(mLayerExtLibHandle);
-        return false;
-    }
-
-    return true;
-}
-
-LayerExtWrapper::~LayerExtWrapper() {
-    if (mInst) {
-        mLayerExtDestroyFunc(mInst);
-    }
-
-    if (mLayerExtLibHandle) {
-      dlclose(mLayerExtLibHandle);
     }
 }
 
@@ -1021,19 +981,6 @@ void SurfaceFlinger::init() {
 
     if (mStartPropertySetThread->Start() != NO_ERROR) {
         ALOGE("Run StartPropertySetThread failed!");
-    }
-
-    char layerExtProp[PROPERTY_VALUE_MAX];
-    property_get("vendor.display.use_layer_ext", layerExtProp, "0");
-    if (atoi(layerExtProp)) {
-        mUseLayerExt = true;
-    }
-    property_get("vendor.display.split_layer_ext", layerExtProp, "0");
-    if (atoi(layerExtProp)) {
-        mSplitLayerExt = true;
-    }
-    if ((mUseLayerExt || mSplitLayerExt) && mLayerExt.init()) {
-        ALOGI("Layer Extension is enabled");
     }
 
 #ifdef FPS_MITIGATION_ENABLED
@@ -3211,11 +3158,6 @@ void SurfaceFlinger::postComposition() {
         }
     }
 
-    if (mSplitLayerExt && mLayerExt) {
-        if (mVisibleLayerInfo.layerName.size() != 0) {
-            mLayerExt->UpdateLayerState(mVisibleLayerInfo.layerName, mNumLayers);
-        }
-    }
     mVisibleLayerInfo.layerName.clear();
     mVisibleLayerInfo.layerSequence.clear();
 

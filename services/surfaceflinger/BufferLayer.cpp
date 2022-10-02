@@ -57,7 +57,6 @@
 #include "TimeStats/TimeStats.h"
 
 #include "smomo_interface.h"
-#include "layer_extn_intf.h"
 
 namespace android {
 
@@ -76,9 +75,6 @@ BufferLayer::BufferLayer(const LayerCreationArgs& args)
     mPotentialCursor = args.flags & ISurfaceComposerClient::eCursorWindow;
     mProtectedByApp = args.flags & ISurfaceComposerClient::eProtectedByApp;
 
-    if (mFlinger->mLayerExt) {
-        mLayerClass = mFlinger->mLayerExt->GetLayerClass(mName);
-    }
 }
 
 BufferLayer::~BufferLayer() {

@@ -110,10 +110,7 @@ class DisplayExtnIntf;
 using smomo::SmomoIntf;
 
 namespace composer {
-class LayerExtnIntf;
 }
-
-using composer::LayerExtnIntf;
 
 namespace android {
 
@@ -219,29 +216,6 @@ public:
 
 private:
     void *mDolphinHandle = nullptr;
-};
-
-class LayerExtWrapper {
-public:
-    LayerExtWrapper() {}
-    ~LayerExtWrapper();
-
-    bool init();
-
-    LayerExtnIntf* operator->() { return mInst; }
-    operator bool() { return mInst != nullptr; }
-
-    LayerExtWrapper(const LayerExtWrapper&) = delete;
-    LayerExtWrapper& operator=(const LayerExtWrapper&) = delete;
-
-private:
-    LayerExtnIntf *mInst = nullptr;
-    void *mLayerExtLibHandle = nullptr;
-
-    using CreateLayerExtnFuncPtr = std::add_pointer<bool(uint16_t, LayerExtnIntf**)>::type;
-    using DestroyLayerExtnFuncPtr = std::add_pointer<void(LayerExtnIntf*)>::type;
-    CreateLayerExtnFuncPtr mLayerExtCreateFunc;
-    DestroyLayerExtnFuncPtr mLayerExtDestroyFunc;
 };
 
 class SurfaceFlinger : public BnSurfaceComposer,
@@ -1619,7 +1593,6 @@ private:
 public:
     nsecs_t mVsyncPeriod = -1;
     DolphinWrapper mDolphinWrapper;
-    LayerExtWrapper mLayerExt;
     struct SmomoInfo {
       uint32_t displayId;
       uint32_t layerStackId;
@@ -1645,8 +1618,6 @@ private:
     composer::ComposerExtnIntf *mComposerExtnIntf = nullptr;
     composer::FrameSchedulerIntf *mFrameSchedulerExtnIntf = nullptr;
     composer::DisplayExtnIntf *mDisplayExtnIntf = nullptr;
-    bool mUseLayerExt = false;
-    bool mSplitLayerExt = false;
     bool mHasScreenshot = false;
     float mThermalLevelFps = 0;
     float mLastCachedFps = 0;
