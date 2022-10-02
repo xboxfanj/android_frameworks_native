@@ -25,7 +25,6 @@
 #include <ui/StaticDisplayInfo.h>
 
 #include "DisplayHardware/PowerAdvisor.h"
-#include <composer_extn_intf.h>
 
 namespace android::compositionengine {
 
@@ -49,7 +48,6 @@ struct DisplayCreationArgs {
 
     // Debugging. Human readable name for the display.
     std::string name;
-
 };
 
 /**

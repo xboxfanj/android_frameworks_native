@@ -152,7 +152,6 @@
 #include "TimeStats/TimeStats.h"
 #include "TunnelModeEnabledReporter.h"
 #include "WindowInfosListenerInvoker.h"
-#include <composer_extn_intf.h>
 
 #include "QtiGralloc.h"
 
