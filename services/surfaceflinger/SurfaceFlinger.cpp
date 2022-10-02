@@ -166,16 +166,6 @@
 //#define NO_THREAD_SAFETY_ANALYSIS \
 //    _Pragma("GCC error \"Prefer MAIN_THREAD macros or {Conditional,Timed,Unnecessary}Lock.\"")
 
-composer::ComposerExtnLib composer::ComposerExtnLib::g_composer_ext_lib_;
-
-
-#ifdef PHASE_OFFSET_EXTN
-struct ComposerExtnIntf {
-    composer::PhaseOffsetExtnIntf *phaseOffsetExtnIntf = nullptr;
-};
-struct ComposerExtnIntf g_comp_ext_intf_;
-#endif
-
 namespace android {
 
 using namespace std::string_literals;
@@ -931,28 +921,10 @@ void SurfaceFlinger::init() {
     }
 #endif
 
-    startUnifiedDraw();
-
     mRETid = getRenderEngine().getRETid();
     mSFTid = gettid();
 
     ALOGV("Done initializing");
-}
-
-void SurfaceFlinger::InitComposerExtn() {
-    mComposerExtnIntf = composer::ComposerExtnLib::GetInstance();
-    if (!mComposerExtnIntf) {
-        ALOGE("Unable to get composer extension");
-        return;
-    }
-    int ret = mComposerExtnIntf->CreateFrameScheduler(&mFrameSchedulerExtnIntf);
-    if (ret) {
-        ALOGI("Unable to create frame scheduler extension");
-    }
-}
-
-void SurfaceFlinger::startUnifiedDraw() {
-    createPhaseOffsetExtn();
 }
 
 void SurfaceFlinger::readPersistentProperties() {
@@ -3630,25 +3602,6 @@ void SurfaceFlinger::updateInternalDisplayVsyncLocked(const sp<DisplayDevice>& a
     const Fps refreshRate = activeDisplay->refreshRateConfigs().getActiveMode()->getFps();
     updatePhaseConfiguration(refreshRate);
     mRefreshRateStats->setRefreshRate(refreshRate);
-    if (mUseAdvanceSfOffset && mComposerExtnIntf) {
-        const auto& supportedModes = getDefaultDisplayDeviceLocked()->getSupportedModes();
-        for (const auto& [id, mode] : supportedModes) {
-            mVsyncConfiguration->getConfigsForRefreshRate(mode->getFps());
-        }
-
-        if (mUseWorkDurations) {
-#ifdef DYNAMIC_APP_DURATIONS
-            // Update the Work Durations for the given refresh rates
-            mVsyncConfiguration->UpdateWorkDurations(&mWorkDurationConfigsMap);
-#else
-            // TODO: Remove this once phase offset extension change is available
-            mVsyncConfiguration->UpdateSfOffsets(&mAdvancedSfOffsets);
-#endif
-        } else {
-            // Update the Advanced SF Offsets/Durations
-            mVsyncConfiguration->UpdateSfOffsets(&mAdvancedSfOffsets);
-        }
-    }
 }
 
 void SurfaceFlinger::setFrameBufferSizeForScaling(sp<DisplayDevice> displayDevice,
@@ -8474,53 +8427,6 @@ void SurfaceFlinger::updateInternalDisplaysPresentationMode() {
             compareStack = true;
         }
     }
-}
-
-void SurfaceFlinger::createPhaseOffsetExtn() {
-#ifdef PHASE_OFFSET_EXTN
-    if (mUseAdvanceSfOffset && mComposerExtnIntf) {
-        int ret = mComposerExtnIntf->CreatePhaseOffsetExtn(&g_comp_ext_intf_.phaseOffsetExtnIntf);
-        if (ret) {
-            ALOGI("Unable to create PhaseOffset extension");
-            return;
-        } else {
-            ALOGI("Created PhaseOffset extension");
-        }
-
-        // Populate the fps supported on device in mOffsetCache
-        const auto& supportedModes = getDefaultDisplayDeviceLocked()->getSupportedModes();
-        for (const auto& [id, mode] : supportedModes) {
-            mVsyncConfiguration->getConfigsForRefreshRate(mode->getFps());
-        }
-
-        if (property_get_bool("debug.sf.use_phase_offsets_as_durations", false)) {
-            mUseWorkDurations = true;
-        }
-
-        if (mUseWorkDurations) {
-            ALOGI("Use work durations");
-#ifdef DYNAMIC_APP_DURATIONS
-            // Update the Work Durations for the given refresh rates in mOffsets map
-            g_comp_ext_intf_.phaseOffsetExtnIntf->GetWorkDurationConfigs(&mWorkDurationConfigsMap);
-            mVsyncConfiguration->UpdateWorkDurations(&mWorkDurationConfigsMap);
-#else 
-            // TODO: Remove this once phase extension change is available
-            g_comp_ext_intf_.phaseOffsetExtnIntf->GetAdvancedSfOffsets(&mAdvancedSfOffsets);
-            mVsyncConfiguration->UpdateSfOffsets(&mAdvancedSfOffsets);
-#endif
-        } else {
-            ALOGI("Use phase offsets");
-            // Update the Advanced SF Offsets for the given refresh rates in mOffsets map
-            g_comp_ext_intf_.phaseOffsetExtnIntf->GetAdvancedSfOffsets(&mAdvancedSfOffsets);
-            mVsyncConfiguration->UpdateSfOffsets(&mAdvancedSfOffsets);
-        }
-
-        const auto vsyncConfig =
-            mVsyncModulator->setVsyncConfigSet(mVsyncConfiguration->getCurrentConfigs());
-        ALOGI("VsyncConfig sfOffset %" PRId64 "\n", vsyncConfig.sfOffset);
-        ALOGI("VsyncConfig appOffset %" PRId64 "\n", vsyncConfig.appOffset);
-    }
-#endif
 }
 
 void SurfaceFlinger::NotifyIdleStatus() {

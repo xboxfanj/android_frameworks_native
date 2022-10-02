@@ -97,8 +97,6 @@
 using namespace android::surfaceflinger;
 
 namespace composer {
-class ComposerExtnIntf;
-class ComposerExtnLib;
 class FrameSchedulerIntf;
 } // namespace composer
 
@@ -776,10 +774,6 @@ private:
     // Returns whether a new buffer has been latched.
     bool latchBuffers();
 
-    // Check if unified draw supported
-    void startUnifiedDraw();
-    void InitComposerExtn();
-
     void updateLayerGeometry();
 
     void updateInputFlinger();
@@ -1208,8 +1202,6 @@ private:
 
     void updateInternalDisplaysPresentationMode();
 
-    void createPhaseOffsetExtn();
-
     void setupIdleTimeoutHandling(uint32_t displayId);
 
     void setEarlyWakeUpConfig(const sp<DisplayDevice>& display, hal::PowerMode mode);
@@ -1558,7 +1550,6 @@ private:
     bool mUseWorkDurations = false;
     bool mDisplaySizeChanged = false;
 
-    composer::ComposerExtnIntf *mComposerExtnIntf = nullptr;
     composer::FrameSchedulerIntf *mFrameSchedulerExtnIntf = nullptr;
     bool mHasScreenshot = false;
     float mThermalLevelFps = 0;
