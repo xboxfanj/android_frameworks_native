@@ -1938,7 +1938,6 @@ void SurfaceFlinger::scheduleCompositeImmed() {
     mMustComposite = true;
     mScheduler->resetIdleTimer();
     notifyDisplayUpdateImminent();
-    mScheduler->scheduleFrameImmed();
 }
 
 void SurfaceFlinger::scheduleRepaint() {
