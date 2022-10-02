@@ -96,18 +96,12 @@
 
 using namespace android::surfaceflinger;
 
-namespace smomo {
-class SmomoIntf;
-} // namespace smomo
-
 namespace composer {
 class ComposerExtnIntf;
 class ComposerExtnLib;
 class FrameSchedulerIntf;
 class DisplayExtnIntf;
 } // namespace composer
-
-using smomo::SmomoIntf;
 
 namespace composer {
 }
@@ -816,8 +810,6 @@ private:
     // Check if unified draw supported
     void startUnifiedDraw();
     void InitComposerExtn();
-    void createSmomoInstance(const DisplayDeviceState& state);
-    void destroySmomoInstance(const sp<DisplayDevice>& display);
 
     void updateLayerGeometry();
 
@@ -1585,21 +1577,10 @@ private:
 
     const sp<WindowInfosListenerInvoker> mWindowInfosListenerInvoker;
     void setRefreshRates(const sp<DisplayDevice>& display);
-    void UpdateSmomoState();
-    void updateSmomoLayerInfo(TransactionState &ts,
-        int64_t desiredPresentTime, bool isAutoTimestamp);
-    SmomoIntf* getSmomoInstance(const uint32_t layerStackId) const;
 
 public:
     nsecs_t mVsyncPeriod = -1;
     DolphinWrapper mDolphinWrapper;
-    struct SmomoInfo {
-      uint32_t displayId;
-      uint32_t layerStackId;
-      bool active = false;
-      SmomoIntf *smoMo = nullptr;
-    };
-    std::vector<SmomoInfo> mSmomoInstances;
 
     struct VisibleLayerInfo {
       std::vector<std::string> layerName;

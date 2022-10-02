@@ -56,8 +56,6 @@
 #include "LayerRejecter.h"
 #include "TimeStats/TimeStats.h"
 
-#include "smomo_interface.h"
-
 namespace android {
 
 using gui::WindowInfo;
@@ -523,10 +521,6 @@ bool BufferLayer::latchBuffer(bool& recomputeVisibleRegions, nsecs_t latchTime,
 
     if (oldOpacity != isOpaque(s)) {
         recomputeVisibleRegions = true;
-    }
-
-    if (SmomoIntf *smoMo = mFlinger->getSmomoInstance(getLayerStack().id)) {
-        smoMo->SetPresentTime(getSequence(), mBufferInfo.mDesiredPresentTime);
     }
 
     return true;

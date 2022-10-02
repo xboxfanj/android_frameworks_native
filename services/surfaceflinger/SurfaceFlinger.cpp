@@ -154,7 +154,6 @@
 #include "WindowInfosListenerInvoker.h"
 #include <composer_extn_intf.h>
 
-#include "smomo_interface.h"
 #include "QtiGralloc.h"
 
 #include <aidl/android/hardware/graphics/common/DisplayDecorationSupport.h>
@@ -350,28 +349,6 @@ bool callingThreadHasInternalSystemWindowAccess() {
     const int uid = ipc->getCallingUid();
     return uid == AID_GRAPHICS || uid == AID_SYSTEM ||
         PermissionCache::checkPermission(sInternalSystemWindow, pid, uid);
-}
-
-void SurfaceFlinger::setRefreshRates(const sp<DisplayDevice>& display) {
-    // Get Primary Smomo Instance.
-    std::vector<float> refreshRates;
-
-    auto iter = display->refreshRateConfigs().getAllRefreshRates().cbegin();
-    while (iter != display->refreshRateConfigs().getAllRefreshRates().cend()) {
-        if (display->refreshRateConfigs().isModeAllowed(iter->second->getId())) {
-            refreshRates.push_back(iter->second->getFps().getValue());
-        }
-        ++iter;
-    }
-
-    SmomoIntf *smoMo = nullptr;
-    for (auto &instance: mSmomoInstances) {
-        smoMo = instance.smoMo;
-        if (smoMo == nullptr) {
-            continue;
-        }
-        smoMo->SetDisplayRefreshRates(refreshRates);
-    }
 }
 
 bool DolphinWrapper::init() {
@@ -1026,69 +1003,6 @@ void SurfaceFlinger::InitComposerExtn() {
        ALOGI("Unable to create display extension");
     }
     ALOGI("Init: mDisplayExtnIntf: %p", mDisplayExtnIntf);
-}
-
-void SurfaceFlinger::createSmomoInstance(const DisplayDeviceState& state) {
-    if (state.isVirtual() || state.physical->type == ui::DisplayConnectionType::External) {
-        return;
-    }
-    char smomoProp[PROPERTY_VALUE_MAX];
-    property_get("vendor.display.use_smooth_motion", smomoProp, "0");
-    if (!atoi(smomoProp)) {
-        ALOGI("Smomo is disabled through property");
-        return;
-    }
-    SmomoInfo smomoInfo;
-    smomoInfo.displayId = state.physical->hwcDisplayId;
-    smomoInfo.layerStackId = state.layerStack.id;
-    smomoInfo.active = true;
-    smomo::DisplayInfo displayInfo;
-    displayInfo.display_id = state.physical->hwcDisplayId;
-    displayInfo.is_primary = state.physical->hwcDisplayId == 0;
-    displayInfo.type = smomo::kBuiltin;
-    mComposerExtnIntf = composer::ComposerExtnLib::GetInstance();
-    bool ret = mComposerExtnIntf->CreateSmomoExtn(&smomoInfo.smoMo, displayInfo);
-    if (!ret) {
-        ALOGI("Unable to create smomo extension for display: %d", displayInfo.display_id);
-        return;
-    }
-
-    mSmomoInstances.push_back(smomoInfo);
-    // Set refresh rates for primary display's instance.
-    smomoInfo.smoMo->SetChangeRefreshRateCallback(
-           [this](int32_t refreshRate) {
-                setRefreshRateTo(refreshRate);
-           });
-
-    const auto display = getDefaultDisplayDeviceLocked();
-    setRefreshRates(display);
-
-    if (mSmomoInstances.size() > 1) {
-        // Disable DRC on all instances.
-        for (auto &instance : mSmomoInstances) {
-            instance.smoMo->SetRefreshRateChangeStatus(false);
-        }
-    }
-
-    ALOGI("SmoMo is enabled for display: %d", displayInfo.display_id);
-}
-
-void SurfaceFlinger::destroySmomoInstance(const sp<DisplayDevice>& display) {
-  uint32_t hwcDisplayId = 0;
-  if (!getHwcDisplayId(display, &hwcDisplayId)) {
-      return;
-  }
-
-  mSmomoInstances.erase(std::remove_if(mSmomoInstances.begin(), mSmomoInstances.end(),
-                                       [&](SmomoInfo const &smomoInfo) {
-                                          return smomoInfo.displayId == hwcDisplayId;
-                                       }), mSmomoInstances.end());
-
-  // Enable DRC if only one instance is active.
-  if (mSmomoInstances.size() == 1) {
-      // Disable DRC on all instances.
-      mSmomoInstances.at(0).smoMo->SetRefreshRateChangeStatus(false);
-  }
 }
 
 void SurfaceFlinger::startUnifiedDraw() {
@@ -2419,11 +2333,6 @@ void SurfaceFlinger::syncToDisplayHardware() NO_THREAD_SAFETY_ANALYSIS {
     ATRACE_CALL();
 
     const uint32_t layerStackId = getDefaultDisplayDeviceLocked()->getLayerStack().id;
-    if (SmomoIntf *smoMo = getSmomoInstance(layerStackId)) {
-        nsecs_t timestamp = 0;
-        bool needResync = smoMo->SyncToDisplay(previousFrameFence().fence, &timestamp);
-        ALOGV("needResync = %d, timestamp = %" PRId64, needResync, timestamp);
-    }
 }
 
 void SurfaceFlinger::updateFrameScheduler() NO_THREAD_SAFETY_ANALYSIS {
@@ -2461,14 +2370,6 @@ bool SurfaceFlinger::commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expected
 
     if (mDolphinWrapper.dolphinTrackVsyncSignal) {
         mDolphinWrapper.dolphinTrackVsyncSignal(frameTime, vsyncId, expectedVsyncTime);
-    }
-
-    SmomoIntf *smoMo = nullptr;
-    for (auto &instance: mSmomoInstances) {
-        smoMo = instance.smoMo;
-        if (smoMo) {
-            smoMo->OnVsync(expectedVsyncTime);
-        }
     }
 
     // we set this once at the beginning of commit to ensure consistency throughout the whole frame
@@ -3116,8 +3017,6 @@ void SurfaceFlinger::postComposition() {
     const size_t appConnections = mScheduler->getEventThreadConnectionCount(mAppConnectionHandle);
     mTimeStats->recordDisplayEventConnectionCount(sfConnections + appConnections);
 
-    UpdateSmomoState();
-
     if (isDisplayConnected && !display->isPoweredOn()) {
         getRenderEngine().cleanupPostRender();
         return;
@@ -3172,147 +3071,6 @@ void SurfaceFlinger::postComposition() {
         uint32_t fps = display->refreshRateConfigs().getActiveMode()->getFps().getValue();
         setContentFps(fps);
     }
-}
-
-void SurfaceFlinger::UpdateSmomoState() {
-    ATRACE_NAME("SmoMoUpdateState");
-    Mutex::Autolock lock(mStateLock);
-    // Check if smomo instances exist.
-    if (!mSmomoInstances.size()) {
-        return;
-    }
-
-    if (mSmomoInstances.size() > 1) {
-        mDrawingState.traverse([&](Layer* layer) {
-            layer->setSmomoLayerStackId();
-        });
-    }
-
-    // Disable smomo if external or virtual is connected.
-    bool enableSmomo = mSmomoInstances.size() == mDisplays.size();
-    uint32_t fps = 0;
-    int content_fps = 0;
-    int numActiveDisplays = 0;
-    for (auto &instance: mSmomoInstances) {
-        SmomoIntf *smoMo = instance.smoMo;
-        sp<DisplayDevice> device = nullptr;
-
-        for (const auto& [token, displayDevice] : mDisplays) {
-            uint32_t hwcDisplayId;
-            if (!getHwcDisplayId(displayDevice, &hwcDisplayId)) {
-                continue;
-            }
-            if (hwcDisplayId == instance.displayId) {
-                device = displayDevice;
-                break;
-            }
-        }
-
-        instance.active = device->getPowerMode() != hal::PowerMode::OFF;
-        if (!instance.active) {
-            continue;
-        }
-
-        std::vector<smomo::SmomoLayerStats> layers;
-        if (enableSmomo) {
-            const auto compositionDisplay = device->getCompositionDisplay();
-            compositionDisplay->getVisibleLayerInfo(&mVisibleLayerInfo.layerName,
-                    &mVisibleLayerInfo.layerSequence);
-            bool visibleLayersInfo = (mVisibleLayerInfo.layerName.size() != 0);
-
-            if (visibleLayersInfo) {
-                for (int i = 0; i < mVisibleLayerInfo.layerName.size(); i++) {
-                    smomo::SmomoLayerStats layerStats;
-                    layerStats.name = mVisibleLayerInfo.layerName.at(i);
-                    layerStats.id = mVisibleLayerInfo.layerSequence.at(i);
-                    layers.push_back(layerStats);
-                }
-            }
-
-            fps =  device->getActiveMode()->getFps().getValue();
-        }
-
-        smoMo->UpdateSmomoState(layers, fps);
-
-        content_fps = smoMo->GetFrameRate();
-        numActiveDisplays++;
-    }
-
-    if (numActiveDisplays == 1) {
-        bool is_valid_content_fps = false;
-        if (mSmomoInstances.size() == 1) {
-            if (content_fps > 0) {
-                if (mLayersWithQueuedFrames.size() > 1) {
-                    mUiLayerFrameCount++;
-                } else {
-                    mUiLayerFrameCount = 0;
-                }
-
-                is_valid_content_fps = (mUiLayerFrameCount < fps) ? true : false;
-            } else {
-                mUiLayerFrameCount = 0;
-            }
-        }
-
-        setContentFps(is_valid_content_fps ? content_fps : fps);
-    }
-
-    // Disable DRC if active displays is more than 1.
-    for (auto &instance : mSmomoInstances) {
-        instance.smoMo->SetRefreshRateChangeStatus((numActiveDisplays == 1));
-    }
-}
-
-SmomoIntf* SurfaceFlinger::getSmomoInstance(const uint32_t layerStackId) const {
-    SmomoIntf *smoMo = nullptr;
-
-    if (mSmomoInstances.size() == 1) {
-        smoMo = mSmomoInstances.back().smoMo;
-        return smoMo;
-    }
-
-    for (auto &instance: mSmomoInstances) {
-        if (instance.layerStackId == layerStackId) {
-            smoMo = instance.smoMo;
-            break;
-        }
-    }
-
-    return smoMo;
-}
-
-void SurfaceFlinger::updateSmomoLayerInfo(TransactionState &ts,
-        int64_t desiredPresentTime, bool isAutoTimestamp) {
-    ts.traverseStatesWithBuffers([&](const layer_state_t& state) {
-        sp<Layer> layer = fromHandle(state.surface).promote();
-        SmomoIntf *smoMo = nullptr;
-        if (layer != nullptr) {
-            smoMo = getSmomoInstance(layer->getSmomoLayerStackId());
-        }
-
-        if (smoMo) {
-            smomo::SmomoBufferStats bufferStats;
-            bufferStats.id = layer->getSequence();
-            bufferStats.auto_timestamp = isAutoTimestamp;
-            bufferStats.timestamp = desiredPresentTime;
-            bufferStats.dequeue_latency = 0;
-            bufferStats.key = desiredPresentTime;
-#ifdef TIMED_RENDERING_METADATA_FEATURE
-            auto buffer = getExternalTextureFromBufferData(*state.bufferData,
-                    layer->getDebugName());
-            if (buffer && buffer->getBuffer()) {
-                bufferStats.buffer_hnd = buffer->getBuffer()->handle;
-            }
-#endif
-            smoMo->CollectLayerStats(bufferStats);
-
-            const DisplayStatInfo stats =
-                mScheduler->getDisplayStatInfo(systemTime(SYSTEM_TIME_MONOTONIC));
-            if (smoMo->FrameIsLate(bufferStats.id, stats.vsyncTime)) {
-                scheduleCompositeImmed();
-            }
-        }
-      });
 }
 
 FloatRect SurfaceFlinger::getMaxDisplayBounds() {
@@ -3841,7 +3599,6 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     }
 
     mDisplays.try_emplace(displayToken, std::move(display));
-    createSmomoInstance(state);
 }
 
 void SurfaceFlinger::processDisplayRemoved(const wp<IBinder>& displayToken) {
@@ -3854,7 +3611,6 @@ void SurfaceFlinger::processDisplayRemoved(const wp<IBinder>& displayToken) {
         } else {
             dispatchDisplayHotplugEvent(display->getPhysicalId(), false);
         }
-        destroySmomoInstance(display);
     }
 
     mDisplays.erase(displayToken);
@@ -3917,13 +3673,6 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
         bool displaySizeChanged = false;
         if (currentState.layerStack != drawingState.layerStack) {
             display->setLayerStack(currentState.layerStack);
-            for (auto &instance: mSmomoInstances) {
-                if ((instance.displayId == currentState.physical->hwcDisplayId) &&
-                    instance.layerStackId == drawingState.layerStack.id) {
-                    instance.layerStackId = currentState.layerStack.id;
-                    break;
-                }
-            }
         }
         if (currentState.flags != drawingState.flags) {
             display->setFlags(currentState.flags);
@@ -5043,11 +4792,6 @@ auto SurfaceFlinger::transactionIsReadyToBeApplied(TransactionState& transaction
                 return TransactionReadiness::NotReady;
             }
 
-            if (SmomoIntf *smoMo = getSmomoInstance(layer->getSmomoLayerStackId())) {
-                if (smoMo->FrameIsEarly(layer->getSequence(), desiredPresentTime)) {
-                    return TransactionReadiness::NotReady;
-                }
-            }
         }
     }
     return fenceUnsignaled ? TransactionReadiness::ReadyUnsignaled : TransactionReadiness::Ready;
@@ -5166,8 +4910,6 @@ status_t SurfaceFlinger::setTransactionState(
     if (state.transactionCommittedSignal) {
         waitForSynchronousTransaction(*state.transactionCommittedSignal);
     }
-
-    updateSmomoLayerInfo(state, desiredPresentTime, isAutoTimestamp);
 
     return NO_ERROR;
 }
@@ -8393,7 +8135,6 @@ status_t SurfaceFlinger::setDesiredDisplayModeSpecsInternal(
                          preferredDisplayMode->getId().value());
     }
 
-    setRefreshRates(display);
     return NO_ERROR;
 }
 
