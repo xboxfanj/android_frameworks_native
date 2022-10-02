@@ -267,7 +267,6 @@ public:
     Error setLayerVisibleRegion(Display display, Layer layer,
                                 const std::vector<IComposerClient::Rect>& visible) override;
     Error setLayerZOrder(Display display, Layer layer, uint32_t z) override;
-    Error setLayerType(Display display, Layer layer, uint32_t type) override;
 
     // Composer HAL 2.2
     Error setLayerPerFrameMetadata(
@@ -347,7 +346,6 @@ private:
         ~CommandWriter() override {}
 
         void setDisplayElapseTime(uint64_t time);
-        void setLayerType(uint32_t type);
     };
 
     void registerCallback(const sp<IComposerCallback>& callback);

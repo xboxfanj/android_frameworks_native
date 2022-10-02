@@ -322,7 +322,6 @@ public:
     [[nodiscard]] virtual hal::Error setTransform(hal::Transform transform) = 0;
     [[nodiscard]] virtual hal::Error setVisibleRegion(const android::Region& region) = 0;
     [[nodiscard]] virtual hal::Error setZOrder(uint32_t z) = 0;
-    [[nodiscard]] virtual hal::Error setType(uint32_t type) = 0;
 
     // Composer HAL 2.3
     [[nodiscard]] virtual hal::Error setColorTransform(const android::mat4& matrix) = 0;
@@ -372,7 +371,6 @@ public:
     hal::Error setTransform(hal::Transform transform) override;
     hal::Error setVisibleRegion(const android::Region& region) override;
     hal::Error setZOrder(uint32_t z) override;
-    hal::Error setType(uint32_t type) override;
 
     // Composer HAL 2.3
     hal::Error setColorTransform(const android::mat4& matrix) override;
@@ -405,7 +403,6 @@ private:
     android::HdrMetadata mHdrMetadata;
     android::mat4 mColorMatrix;
     uint32_t mBufferSlot;
-    uint32_t mType{0};
 };
 
 } // namespace impl

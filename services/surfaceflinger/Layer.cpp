@@ -451,8 +451,6 @@ void Layer::prepareGeometryCompositionState() {
     compositionState->isSecureCamera = isSecureCamera();
     compositionState->isScreenshot = isScreenshot();
 
-    compositionState->layerClass = mLayerClass;
-
     compositionState->metadata.clear();
     const auto& supportedMetadata = mFlinger->getHwComposer().getSupportedLayerGenericMetadata();
     for (const auto& [key, mandatory] : supportedMetadata) {
@@ -1521,7 +1519,6 @@ void Layer::miniDump(std::string& result, const DisplayDevice& display) const {
         StringAppendF(&result, "  %10d | ", layerState.z);
     }
     StringAppendF(&result, "  %10d | ", mWindowType);
-    StringAppendF(&result, "  %10d | ", mLayerClass);
     StringAppendF(&result, "%10s | ", toString(getCompositionType(display)).c_str());
     StringAppendF(&result, "%10s | ", toString(outputLayerState.bufferTransform).c_str());
     const Rect& frame = outputLayerState.displayFrame;

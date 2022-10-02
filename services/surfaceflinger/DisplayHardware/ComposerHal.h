@@ -200,7 +200,6 @@ public:
     virtual Error setLayerVisibleRegion(Display display, Layer layer,
                                         const std::vector<IComposerClient::Rect>& visible) = 0;
     virtual Error setLayerZOrder(Display display, Layer layer, uint32_t z) = 0;
-    virtual Error setLayerType(Display display, Layer layer, uint32_t type) = 0;
 
     // Composer HAL 2.2
     virtual Error setLayerPerFrameMetadata(

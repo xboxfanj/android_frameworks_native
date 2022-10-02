@@ -1617,13 +1617,5 @@ void Output::finishPrepareFrame() {
     mRenderSurface->prepareFrame(state.usesClientComposition, state.usesDeviceComposition);
 }
 
-void Output::getVisibleLayerInfo(std::vector<std::string> *layerName,
-                                 std::vector<int32_t> *layerSequence) const {
-    for (auto* layer: getOutputLayersOrderedByZ()) {
-        layerName->push_back(layer->getLayerFE().getDebugName());
-        layerSequence->push_back(layer->getLayerFE().getSequence());
-    }
-}
-
 } // namespace impl
 } // namespace android::compositionengine

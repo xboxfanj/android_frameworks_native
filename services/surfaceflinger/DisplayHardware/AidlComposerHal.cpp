@@ -218,17 +218,6 @@ bool AidlComposer::isDeclared(const std::string& serviceName) {
     return AServiceManager_isDeclared(instance(serviceName).c_str());
 }
 
-void AidlComposer::AidlCommandWriter::setLayerType(uint32_t type)
-{
-    constexpr uint16_t kSetLayerTypeLength = 1;
-    //TODO(b/215740085): Refactoring in AidlComposerHal requires changes
-    //beginCommand(static_cast<V2_1::IComposerClient::Command>(
-    //                     IQtiComposerClient::Command::SET_LAYER_TYPE),
-    //             kSetLayerTypeLength);
-    //write(type);
-    //endCommand();
-}
-
 void AidlComposer::AidlCommandWriter::setDisplayElapseTime(uint64_t time)
 {
     constexpr uint16_t kSetDisplayElapseTimeLength = 2;
@@ -775,10 +764,6 @@ Error AidlComposer::setLayerVisibleRegion(Display display, Layer layer,
 
 Error AidlComposer::setLayerZOrder(Display display, Layer layer, uint32_t z) {
     mWriter.setLayerZOrder(translate<int64_t>(display), translate<int64_t>(layer), z);
-    return Error::NONE;
-}
-
-Error AidlComposer::setLayerType(Display display, Layer layer, uint32_t type) {
     return Error::NONE;
 }
 

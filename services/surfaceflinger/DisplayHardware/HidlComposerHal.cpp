@@ -189,16 +189,6 @@ std::vector<To> translate(const hidl_vec<From>& in) {
 
 } // anonymous namespace
 
-void HidlComposer::CommandWriter::setLayerType(uint32_t type)
-{
-    constexpr uint16_t kSetLayerTypeLength = 1;
-    beginCommand(static_cast<V2_1::IComposerClient::Command>(
-                         IQtiComposerClient::Command::SET_LAYER_TYPE),
-                 kSetLayerTypeLength);
-    write(type);
-    endCommand();
-}
-
 void HidlComposer::CommandWriter::setDisplayElapseTime(uint64_t time)
 {
     constexpr uint16_t kSetDisplayElapseTimeLength = 2;
@@ -847,17 +837,6 @@ Error HidlComposer::setLayerZOrder(Display display, Layer layer, uint32_t z) {
     mWriter.selectDisplay(display);
     mWriter.selectLayer(layer);
     mWriter.setLayerZOrder(z);
-    return Error::NONE;
-}
-
-Error HidlComposer::setLayerType(Display display, Layer layer, uint32_t type)
-{
-    if (mClient_2_4) {
-        mWriter.selectDisplay(display);
-        mWriter.selectLayer(layer);
-        mWriter.setLayerType(type);
-    }
-
     return Error::NONE;
 }
 
