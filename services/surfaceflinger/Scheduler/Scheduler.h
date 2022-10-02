@@ -89,7 +89,6 @@ struct ISchedulerCallback {
     virtual void requestDisplayMode(DisplayModePtr, DisplayModeEvent) = 0;
     virtual void kernelTimerChanged(bool expired) = 0;
     virtual void triggerOnFrameRateOverridesChanged() = 0;
-    virtual void getModeFromFps(float, DisplayModePtr&) = 0;
 
 protected:
     ~ISchedulerCallback() = default;

@@ -1236,7 +1236,6 @@ private:
     int getMaxAcquiredBufferCountForRefreshRate(Fps refreshRate) const;
     void setDesiredModeByThermalLevel(float newFpsRequest);
     bool isFpsDeferNeeded(const ActiveModeInfo& info) REQUIRES(mStateLock);
-    virtual void getModeFromFps(float fps,DisplayModePtr& outMode);
     void handleNewLevelFps(float currFps, float newLevelFps, float* fpsToSet);
 
     void updateInternalDisplayVsyncLocked(const sp<DisplayDevice>& activeDisplay)

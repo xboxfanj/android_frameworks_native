@@ -8387,22 +8387,6 @@ void SurfaceFlinger::setEarlyWakeUpConfig(const sp<DisplayDevice>& display, hal:
 void SurfaceFlinger::setupIdleTimeoutHandling(uint32_t displayId) {
 }
 
-void SurfaceFlinger::getModeFromFps(float fps,DisplayModePtr& outMode) {
-    const auto display = FTL_FAKE_GUARD(mStateLock, getDefaultDisplayDeviceLocked());
-    const auto& supportedModes = display->getSupportedModes();
-    auto currMode = display->getActiveMode();
-
-    for (const auto& [id, mode] : supportedModes) {
-        if (mode->getWidth() == currMode->getWidth() &&
-            mode->getHeight() == currMode->getHeight() &&
-            (int32_t)(mode->getFps().getValue()) == (int32_t)(fps)) {
-            outMode = mode;
-            return;
-        }
-    }
-    outMode = nullptr;
-}
-
 void SurfaceFlinger::handleNewLevelFps(float currFps, float newLevelFps, float* fpsToSet) {
     if (!mThermalLevelFps) { // Thermal hint not running already, cache current fps
         mLastCachedFps = currFps;
@@ -8437,7 +8421,6 @@ void SurfaceFlinger::setDesiredModeByThermalLevel(float newLevelFps) {
     }
 
     auto mode = display->getMode(display->getActiveMode()->getId());
-    getModeFromFps(fps, mode);
 
     if (!mode) {
         return;

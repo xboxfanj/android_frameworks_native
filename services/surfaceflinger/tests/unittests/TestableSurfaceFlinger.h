@@ -893,8 +893,6 @@ public:
 private:
     constexpr static int64_t kVsyncId = 123;
 
-    void getModeFromFps(float, DisplayModePtr&) {return; }
-
     surfaceflinger::test::Factory mFactory;
     sp<SurfaceFlinger> mFlinger;
     scheduler::mock::SchedulerCallback mSchedulerCallback;
