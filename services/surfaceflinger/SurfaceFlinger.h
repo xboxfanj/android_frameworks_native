@@ -97,7 +97,6 @@
 using namespace android::surfaceflinger;
 
 namespace composer {
-class FrameSchedulerIntf;
 } // namespace composer
 
 namespace composer {
@@ -782,7 +781,6 @@ private:
                           std::vector<gui::DisplayInfo>& outDisplayInfos);
     void commitInputWindowCommands() REQUIRES(mStateLock);
     void updateCursorAsync();
-    void updateFrameScheduler();
     void syncToDisplayHardware();
 
     void initScheduler(const sp<DisplayDevice>& display) REQUIRES(mStateLock);
@@ -1550,7 +1548,6 @@ private:
     bool mUseWorkDurations = false;
     bool mDisplaySizeChanged = false;
 
-    composer::FrameSchedulerIntf *mFrameSchedulerExtnIntf = nullptr;
     bool mHasScreenshot = false;
     float mThermalLevelFps = 0;
     float mLastCachedFps = 0;

@@ -2250,36 +2250,6 @@ void SurfaceFlinger::syncToDisplayHardware() NO_THREAD_SAFETY_ANALYSIS {
     const uint32_t layerStackId = getDefaultDisplayDeviceLocked()->getLayerStack().id;
 }
 
-void SurfaceFlinger::updateFrameScheduler() NO_THREAD_SAFETY_ANALYSIS {
-    if (!mFrameSchedulerExtnIntf) {
-        return;
-    }
-
-    const sp<Fence>& fence = mVsyncModulator->getVsyncConfig().sfOffset > 0 ? mPreviousPresentFences[0].fence
-                                                                            : mPreviousPresentFences[1].fence;
-
-    if (fence == Fence::NO_FENCE) {
-        return;
-    }
-    int fenceFd = fence->get();
-    nsecs_t timeStamp = 0;
-    int ret = mFrameSchedulerExtnIntf->UpdateFrameScheduling(fenceFd, &timeStamp);
-    if (ret <= 0) {
-        return;
-    }
-
-    const nsecs_t period = getVsyncPeriodFromHWC();
-    mScheduler->resyncToHardwareVsync(true, Fps::fromPeriodNsecs(period),
-                                      true /* force resync */);
-    if (timeStamp > 0) {
-        bool periodFlushed = false;
-        mScheduler->addResyncSample(timeStamp, period,&periodFlushed);
-        if (periodFlushed) {
-            modulateVsync(&VsyncModulator::onRefreshRateChangeCompleted);
-        }
-    }
-}
-
 bool SurfaceFlinger::commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expectedVsyncTime) 
         FTL_FAKE_GUARD(kMainThreadContext) {
 
@@ -2301,7 +2271,6 @@ bool SurfaceFlinger::commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expected
 
     const nsecs_t lastScheduledPresentTime = mScheduledPresentTime;
     mScheduledPresentTime = expectedVsyncTime;
-    updateFrameScheduler();
     syncToDisplayHardware();
 
     if (mPowerHintSessionData.sessionEnabled) {
