@@ -93,8 +93,6 @@ public:
     // Virtual display surface needs to prepare the frame based on composition type. Skip
     // any client composition prediction.
     virtual bool supportsCompositionStrategyPrediction() const override { return false; };
-    virtual int getClientTargetCurrentSlot() override;
-    virtual ui::Dataspace getClientTargetCurrentDataspace() override;
 
 private:
     enum Source : size_t {
