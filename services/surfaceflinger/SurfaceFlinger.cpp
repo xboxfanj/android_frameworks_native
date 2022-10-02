@@ -909,18 +909,6 @@ void SurfaceFlinger::init() {
         ALOGE("Run StartPropertySetThread failed!");
     }
 
-#ifdef FPS_MITIGATION_ENABLED
-    auto currMode = display->getActiveMode();
-    const auto& supportedModes = display->getSupportedModes();
-    std::vector<float> fps_list;
-    for (const auto& [id, mode] : supportedModes) {
-        if (mode->getWidth() == currMode->getWidth() &&
-            mode->getHeight() == currMode->getHeight()) {
-            fps_list.push_back(int32_t(mode->getFps().getValue()));
-        }
-    }
-#endif
-
     mRETid = getRenderEngine().getRETid();
     mSFTid = gettid();
 
