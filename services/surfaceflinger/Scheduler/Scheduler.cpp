@@ -473,8 +473,6 @@ void Scheduler::resync() {
             std::scoped_lock lock(mRefreshRateConfigsLock);
             return mRefreshRateConfigs->getActiveMode()->getFps();
         }();
-        resyncToHardwareVsync(false,
-            Fps::fromPeriodNsecs(mSchedulerCallback.getVsyncPeriodFromHWCcb()));
     }
 }
 

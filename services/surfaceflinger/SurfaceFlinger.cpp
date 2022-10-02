@@ -2031,23 +2031,6 @@ sp<DisplayDevice> SurfaceFlinger::getCurrentVsyncSource() {
     return getDefaultDisplayDeviceLocked();
 }
 
-nsecs_t SurfaceFlinger::getVsyncPeriodFromHWCcb() {
-    std::lock_guard<std::recursive_mutex> lockVsync(mVsyncLock);
-
-    auto display = getDefaultDisplayDeviceLocked();
-    if (mNextVsyncSource) {
-        display = mNextVsyncSource;
-    } else if (mActiveVsyncSource) {
-        display = mActiveVsyncSource;
-    }
-
-    if (display && !display->isPrimary()) {
-        return display->getVsyncPeriodFromHWC();
-    }
-
-    return display->refreshRateConfigs().getActiveMode()->getVsyncPeriod();
-}
-
 void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
                                         std::optional<hal::VsyncPeriodNanos> vsyncPeriod) {
     const std::string tracePeriod = [vsyncPeriod]() {
