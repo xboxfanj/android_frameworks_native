@@ -195,23 +195,6 @@ struct SurfaceFlingerBE {
     std::atomic<nsecs_t> mLastSwapTime = 0;
 };
 
-class DolphinWrapper {
-public:
-    DolphinWrapper() { init(); }
-    ~DolphinWrapper();
-    bool init();
-
-    bool (*dolphinInit)() = nullptr;
-    void (*dolphinSetVsyncPeriod)(nsecs_t vsyncPeriod) = nullptr;
-    void (*dolphinTrackBufferIncrement)(const char* name, int counter) = nullptr;
-    void (*dolphinTrackBufferDecrement)(const char* name, int counter) = nullptr;
-    void (*dolphinTrackVsyncSignal)(nsecs_t frameTime, int64_t vsyncId,
-                                    nsecs_t expectedVsyncTime) = nullptr;
-
-private:
-    void *mDolphinHandle = nullptr;
-};
-
 class SurfaceFlinger : public BnSurfaceComposer,
                        public PriorityDumper,
                        private IBinder::DeathRecipient,
@@ -487,18 +470,6 @@ private:
             auto it = mCounterByLayerHandle.find(layerHandle);
             if (it != mCounterByLayerHandle.end()) {
                 auto [name, pendingBuffers] = it->second;
-                if (mDolphinWrapper.dolphinTrackBufferIncrement) {
-                    const std::string transactionName(name);
-                    int newCount = (*pendingBuffers) + 1;
-                    mLock.unlock();
-                    mDolphinWrapper.dolphinTrackBufferIncrement(transactionName.c_str(),
-                            newCount);
-                    mLock.lock();
-                    it = mCounterByLayerHandle.find(layerHandle);
-                    if (it == mCounterByLayerHandle.end()) {
-                        return;
-                    }
-                }
                 int32_t count = ++(*pendingBuffers);
                 ATRACE_INT(name.c_str(), count);
             } else {
@@ -520,7 +491,6 @@ private:
         std::mutex mLock;
         std::unordered_map<BBinder*, std::pair<std::string, std::atomic<int32_t>*>>
                 mCounterByLayerHandle GUARDED_BY(mLock);
-        DolphinWrapper mDolphinWrapper;
     };
 
     using ActiveModeInfo = DisplayDevice::ActiveModeInfo;
@@ -1580,7 +1550,6 @@ private:
 
 public:
     nsecs_t mVsyncPeriod = -1;
-    DolphinWrapper mDolphinWrapper;
 
     struct VisibleLayerInfo {
       std::vector<std::string> layerName;

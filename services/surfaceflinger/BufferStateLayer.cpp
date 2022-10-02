@@ -883,10 +883,6 @@ bool BufferStateLayer::bufferNeedsFiltering() const {
 
 void BufferStateLayer::decrementPendingBufferCount() {
     int32_t pendingBuffers = --mPendingBufferTransactions;
-    if (mFlinger->mDolphinWrapper.dolphinTrackBufferDecrement) {
-        mFlinger->mDolphinWrapper.dolphinTrackBufferDecrement(mBlastTransactionName.c_str(),
-                pendingBuffers);
-    }
     tracePendingBufferCount(pendingBuffers);
 }
 

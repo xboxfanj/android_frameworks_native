@@ -351,45 +351,6 @@ bool callingThreadHasInternalSystemWindowAccess() {
         PermissionCache::checkPermission(sInternalSystemWindow, pid, uid);
 }
 
-bool DolphinWrapper::init() {
-    bool succeed = false;
-    mDolphinHandle = dlopen("libdolphin.so", RTLD_NOW);
-    if (!mDolphinHandle) {
-        ALOGW("Unable to open libdolphin.so: %s.", dlerror());
-    } else {
-        dolphinInit = (bool (*) ())dlsym(mDolphinHandle, "dolphinInit");
-        dolphinSetVsyncPeriod = (void (*) (nsecs_t)) dlsym(mDolphinHandle,
-                "dolphinSetVsyncPeriod");
-        dolphinTrackBufferIncrement = (void (*) (const char*, int))dlsym(mDolphinHandle,
-                "dolphinTrackBufferIncrement");
-        dolphinTrackBufferDecrement = (void (*) (const char*, int))dlsym(mDolphinHandle,
-                "dolphinTrackBufferDecrement");
-        dolphinTrackVsyncSignal = (void (*) (nsecs_t, int64_t, nsecs_t))dlsym(mDolphinHandle,
-                "dolphinTrackVsyncSignal");
-        bool isFunctionsFound = dolphinInit && dolphinSetVsyncPeriod &&
-                                dolphinTrackBufferIncrement && dolphinTrackBufferDecrement &&
-                                dolphinTrackVsyncSignal;
-        if (isFunctionsFound) {
-            dolphinInit();
-            succeed = true;
-        } else {
-            dlclose(mDolphinHandle);
-            dolphinInit = nullptr;
-            dolphinSetVsyncPeriod = nullptr;
-            dolphinTrackBufferIncrement = nullptr;
-            dolphinTrackBufferDecrement = nullptr;
-            dolphinTrackVsyncSignal = nullptr;
-        }
-    }
-    return succeed;
-}
-
-DolphinWrapper::~DolphinWrapper() {
-    if (mDolphinHandle) {
-        dlclose(mDolphinHandle);
-    }
-}
-
 SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
       : mFactory(factory),
         mPid(getpid()),
@@ -1260,9 +1221,6 @@ void SurfaceFlinger::setDesiredActiveMode(const ActiveModeInfo& info) {
     }
 
     mVsyncPeriod = info.mode->getVsyncPeriod();
-    if (mDolphinWrapper.dolphinSetVsyncPeriod) {
-        mDolphinWrapper.dolphinSetVsyncPeriod(mVsyncPeriod);
-    }
 
     if (display->setDesiredActiveMode(info)) {
         scheduleComposite(FrameHint::kNone);
@@ -2367,10 +2325,6 @@ void SurfaceFlinger::updateFrameScheduler() NO_THREAD_SAFETY_ANALYSIS {
 
 bool SurfaceFlinger::commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expectedVsyncTime) 
         FTL_FAKE_GUARD(kMainThreadContext) {
-
-    if (mDolphinWrapper.dolphinTrackVsyncSignal) {
-        mDolphinWrapper.dolphinTrackVsyncSignal(frameTime, vsyncId, expectedVsyncTime);
-    }
 
     // we set this once at the beginning of commit to ensure consistency throughout the whole frame
     mPowerHintSessionData.sessionEnabled = mPowerAdvisor->usePowerHintSession();
