@@ -50,9 +50,6 @@ public:
 
     virtual void setRefreshRateFps(Fps fps) = 0;
     virtual void dump(std::string& result) const = 0;
-    virtual void UpdateSfOffsets(unordered_map<float, int64_t>* advancedSfOffsets) = 0;
-    virtual void UpdateWorkDurations(unordered_map<float, pair<int64_t, int64_t>>*
-                                     workDurationConfigs) = 0;
 };
 
 namespace impl {
@@ -90,13 +87,6 @@ public:
 
     // Returns current offsets in human friendly format.
     void dump(std::string& result) const override;
-
-    // Update the Advanced Sf Offsets for the given refresh rates in mOffsets map
-    void UpdateSfOffsets(unordered_map<float, int64_t>* advancedSfOffsets) override;
-
-    // Update the Work Durations for the given refresh rates in mOffsets map
-    void UpdateWorkDurations(unordered_map<float, pair<int64_t, int64_t>>*
-                             workDurationConfigs) override;
 
 protected:
     virtual VsyncConfiguration::VsyncConfigSet constructOffsets(nsecs_t vsyncDuration) const = 0;
@@ -160,13 +150,6 @@ private:
 class WorkDuration : public VsyncConfiguration {
 public:
     explicit WorkDuration(Fps currentRefrshRate);
-
-    // Update the Advanced Sf Offsets/Work Durations for the given refresh rates in mOffsets map.
-    void UpdateSfOffsets(unordered_map<float, int64_t>* advancedSfOffsets) override;
-
-    // Update the Work Durations for the given refresh rates in mOffsets map.
-    void UpdateWorkDurations(unordered_map<float, pair<int64_t, int64_t>>*
-                             workDurationConfigs) override;
 
 protected:
     // Used for unit tests
