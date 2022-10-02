@@ -51,7 +51,6 @@ public:
     virtual void sendActualWorkDuration(int64_t actualDurationNanos, nsecs_t timestamp) = 0;
     virtual void enablePowerHint(bool enabled) = 0;
     virtual bool startPowerHintSession(const std::vector<int32_t>& threadIds) = 0;
-    virtual bool canNotifyDisplayUpdateImminent() = 0;
 };
 
 namespace impl {
@@ -94,7 +93,6 @@ public:
     void sendActualWorkDuration(int64_t actualDurationNanos, nsecs_t timestamp) override;
     void enablePowerHint(bool enabled) override;
     bool startPowerHintSession(const std::vector<int32_t>& threadIds) override;
-    bool canNotifyDisplayUpdateImminent() override;
 
 private:
     HalWrapper* getPowerHal() REQUIRES(mPowerHalMutex);

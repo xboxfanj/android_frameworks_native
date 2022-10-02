@@ -84,8 +84,7 @@ void traceExpensiveRendering(bool enabled) {
 PowerAdvisor::PowerAdvisor(SurfaceFlinger& flinger) : mFlinger(flinger) {
     if (getUpdateTimeout() > 0ms) {
         mScreenUpdateTimer.emplace("UpdateImminentTimer", getUpdateTimeout(),
-                                   /* resetCallback */
-                                   [this] { mSendUpdateImminent.store(false); },
+                                   /* resetCallback */ nullptr,
                                    /* timeoutCallback */
                                    [this] {
                                        while (true) {
@@ -175,14 +174,6 @@ void PowerAdvisor::notifyDisplayUpdateImminent() {
     if (mScreenUpdateTimer) {
         mLastScreenUpdatedTime.store(systemTime());
     }
-}
-
-bool PowerAdvisor::canNotifyDisplayUpdateImminent() {
-    bool canNotify = mSendUpdateImminent.load();
-    if (mScreenUpdateTimer) {
-        mScreenUpdateTimer->reset();
-    }
-    return canNotify;
 }
 
 // checks both if it supports and if it's enabled
