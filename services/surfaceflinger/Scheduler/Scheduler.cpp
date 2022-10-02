@@ -819,9 +819,4 @@ void Scheduler::setIdleState() {
     mDisplayIdle = true;
 }
 
-void Scheduler::updateThermalFps(float fps) {
-    mThermalFps = fps;
-    mLayerHistory.updateThermalFps(fps);
-}
-
 } // namespace android::scheduler

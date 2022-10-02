@@ -72,7 +72,6 @@ public:
 
     void deregisterLayer(Layer*);
     std::string dump() const;
-    void updateThermalFps(float fps) { mThermalFps = fps; }
 
     // return the frames per second of the layer with the given sequence id.
     float getLayerFramerate(nsecs_t now, int32_t id) const;

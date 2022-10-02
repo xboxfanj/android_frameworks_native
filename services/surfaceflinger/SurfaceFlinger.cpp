@@ -8404,11 +8404,6 @@ void SurfaceFlinger::setDesiredModeByThermalLevel(float newLevelFps) {
 
     mThermalLevelFps = newLevelFps;
 
-    if (fps == currFps) {
-        mScheduler->updateThermalFps(newLevelFps);
-        return;
-    }
-
     auto future = mScheduler->schedule([=]() -> status_t {
         int ret = 0;
         if (!display) {
@@ -8428,7 +8423,6 @@ void SurfaceFlinger::setDesiredModeByThermalLevel(float newLevelFps) {
             return ret;
         }
 
-        mScheduler->updateThermalFps(newLevelFps);
         policy.primaryRange.max = Fps::fromValue(fps);
         policy.appRequestRange.max = Fps::fromValue(fps);
         policy.defaultMode = mode->getId();

@@ -242,7 +242,6 @@ public:
     }
 
     void setIdleState();
-    void updateThermalFps(float fps);
 
 private:
     friend class TestableScheduler;
