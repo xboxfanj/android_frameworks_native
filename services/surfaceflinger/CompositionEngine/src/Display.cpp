@@ -326,52 +326,6 @@ void Display::beginDraw() {
     if (!physicalDisplayId.has_value() || isVirtual()) {
         return;
     }
-#ifdef QTI_UNIFIED_DRAW
-    composer::FBTLayerInfo fbtLayerInfo;
-    composer::FBTSlotInfo current;
-    composer::FBTSlotInfo future;
-    std::vector<composer::LayerFlags> displayLayerFlags;
-    ui::Dataspace dataspace;
-    auto& hwc = getCompositionEngine().getHwComposer();
-    const auto hwcDisplayId = hwc.fromPhysicalDisplayId(*physicalDisplayId);
-    for (const auto& layer : getOutputLayersOrderedByZ()) {
-         composer::LayerFlags layerFlags;
-         auto layerCompositionState = layer->getLayerFE().getCompositionState();
-         layerFlags.secure_camera = layerCompositionState->isSecureCamera;
-         layerFlags.secure_ui     = layerCompositionState->isSecureDisplay;
-         layerFlags.secure_video  = layerCompositionState->hasProtectedContent;
-         layerFlags.blur = (layerCompositionState->backgroundBlurRadius > 0) ||
-                           (layerCompositionState->blurRegions.size() > 0);
-         displayLayerFlags.push_back(layerFlags);
-    }
-    fbtLayerInfo.width = getState().orientedDisplaySpace.getBounds().width;
-    fbtLayerInfo.height = getState().orientedDisplaySpace.getBounds().height;
-    auto renderSurface = getRenderSurface();
-    fbtLayerInfo.secure = renderSurface->isProtected();
-    fbtLayerInfo.dataspace = static_cast<int>(renderSurface->getClientTargetCurrentDataspace());
-
-    // Reset cache if there is a color mode change
-    if (mIsColorModeChanged ) {
-        fbtLayerInfo.dataspace = static_cast<int>(ui::Dataspace::UNKNOWN);
-        mIsColorModeChanged = false;
-    }
-
-    current.index = renderSurface->getClientTargetCurrentSlot();
-    dataspace = renderSurface->getClientTargetCurrentDataspace();
-
-    if (current.index < 0) {
-        return;
-    }
-    const auto id = HalDisplayId::tryCast(mId);
-    if (!mDisplayExtnIntf->BeginDraw(
-        static_cast<uint32_t>(*hwcDisplayId), displayLayerFlags, fbtLayerInfo,
-        current, future)) {
-        hwc.setClientTarget_3_1(*id, future.index, future.fence, dataspace);
-        ALOGV("Slot predicted %d", future.index);
-    } else {
-        ALOGV("Slot not predicted");
-    }
-#endif
 }
 
 bool Display::getSkipColorTransform() const {
@@ -501,38 +455,6 @@ void Display::finishFrame(const compositionengine::CompositionRefreshArgs& refre
 }
 
 void Display::endDraw() {
-#ifdef QTI_UNIFIED_DRAW
-  ATRACE_CALL();
-  auto& outputState = editState();
-  if (!outputState.usesClientComposition || isVirtual()) {
-      return;
-  }
-
-  auto displayId = getDisplayId();
-  if (!displayId.has_value()) {
-      return;
-  }
-
-  auto const physicalDisplayId = PhysicalDisplayId::tryCast(*displayId);
-  if (!physicalDisplayId) {
-      return;
-  }
-
-  auto& hwc = getCompositionEngine().getHwComposer();
-  auto const halDisplayId = hwc.fromPhysicalDisplayId(*physicalDisplayId);
-  if (!halDisplayId.has_value()) {
-      return;
-  }
-
-  composer::FBTSlotInfo info;
-  auto renderSurface = getRenderSurface();
-  info.index = renderSurface->getClientTargetCurrentSlot();
-  info.fence = renderSurface->getClientTargetAcquireFence();
-  uint32_t hwcDisplayId = static_cast<uint32_t>(*halDisplayId);
-  if (mDisplayExtnIntf != nullptr) {
-      mDisplayExtnIntf->EndDraw(hwcDisplayId, info);
-  }
-#endif
 }
 
 } // namespace android::compositionengine::impl

@@ -16,7 +16,6 @@ libdisplayconfig_cc_defaults {
     name: "libcompositionengine_defaults",
     defaults: ["surfaceflinger_defaults",
                "libdisplayconfig_defaults",
-               "unfieddraw_defaults",
               ],
     cflags: [
         "-DLOG_TAG=\"CompositionEngine\"",

@@ -225,13 +225,6 @@ public:
     Error getDisplayDecorationSupport(Display display,
                                       std::optional<DisplayDecorationSupport>* support) override;
     Error setIdleTimerEnabled(Display displayId, std::chrono::milliseconds timeout) override;
-#ifdef QTI_UNIFIED_DRAW
-    Error tryDrawMethod(Display display, IQtiComposerClient::DrawMethod drawMethod) override;
-    Error setLayerFlag(Display display, Layer layer,
-                       IQtiComposerClient::LayerFlag layerFlag) override;
-    Error setClientTarget_3_1(Display display, int32_t slot, int acquireFence,
-                              Dataspace dataspace) override;
-#endif
 
     Error getPhysicalDisplayOrientation(Display displayId,
                                         AidlTransform* outDisplayOrientation) override;
@@ -245,10 +238,6 @@ private:
 
         void setDisplayElapseTime(uint64_t time);
         void setLayerType(uint32_t type);
-#ifdef QTI_UNIFIED_DRAW
-        void setLayerFlag(uint32_t type);
-        void setClientTarget_3_1(int32_t slot, int acquireFence, Dataspace dataspace);
-#endif
     };
 
     // Many public functions above simply write a command into the command

@@ -49,9 +49,6 @@
 #include <ui/DebugUtils.h>
 #include <ui/HdrCapabilities.h>
 #include <utils/Trace.h>
-#ifdef QTI_UNIFIED_DRAW
-#include <vendor/qti/hardware/display/composer/3.1/IQtiComposerClient.h>
-#endif
 #include "TracedOrdinal.h"
 
 using aidl::android::hardware::graphics::composer3::Composition;
@@ -96,9 +93,6 @@ ScaleVector getScale(const Rect& from, const Rect& to) {
 }
 
 } // namespace
-#ifdef QTI_UNIFIED_DRAW
-using vendor::qti::hardware::display::composer::V3_1::IQtiComposerClient;
-#endif
 std::shared_ptr<Output> createOutput(
         const compositionengine::CompositionEngine& compositionEngine) {
     return createOutputTemplated<Output>(compositionEngine);
@@ -842,13 +836,6 @@ void Output::writeCompositionState(const compositionengine::CompositionRefreshAr
                     z, includeGeometry, overrideZ, isPeekingThrough,
                     layer->requiresClientComposition());
         }
-#ifdef QTI_UNIFIED_DRAW
-        if (hasSecureCamera || hasSecureDisplay || needsProtected) {
-            layer->writeLayerFlagToHWC(IQtiComposerClient::LayerFlag::DEFAULT);
-        } else {
-            layer->writeLayerFlagToHWC(IQtiComposerClient::LayerFlag::COMPATIBLE);
-        }
-#endif
     }
     editState().outputLayerHash = outputLayerHash;
 }
